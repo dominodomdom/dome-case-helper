@@ -55,16 +55,11 @@ export const assessCase = createServerFn({ method: "POST" })
       });
       lines.push("", "Vyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.");
 
+      // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
       const assessment = await generateAssessment(lines.join("\n"));
-      const rec = await sb.rpc(SCHEMA.steps.recordAssessmentRpc, {
-        p_case_id: data.caseId,
-        p_user_id: userId,
-        p_assessment: assessment,
-      });
-      if (rec.error) {
-        console.error("urad_record_dome_assessment", rec.error);
-        throw new DomeError(`Hodnocení se nepodařilo uložit: ${rec.error.message} (kód: ${rec.error.code ?? "?"})`);
-      }
+      // Opětovné explicitní ověření vlastnictví těsně před použitím service_role.
+      if ((kase.data as Record<string, unknown>)[c.ownerId] !== userId) throw new DomeError("Případ vám nepatří.", 403);
+      await recordAssessmentAsServer(data.caseId, userId, assessment);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
       return fail(e);
