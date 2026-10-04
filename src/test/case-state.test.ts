@@ -143,10 +143,10 @@ describe("CASE CORE", () => {
   });
   it("LEGACY: uložená částka/lhůta bez vazby se při načtení stane UNKNOWN", () => {
     const s = build();
-    const legacy = { case_state: { ...s, needs: [{ ...s.needs[0]!, amount: 1500, amount_mention: undefined, deadline: "zítra", deadline_anchor: undefined }] } };
+    const legacy = { case_state: { ...s, needs: s.needs.map((x, i) => (i === 0 ? { ...x, amount: 1500, amount_mention: undefined, deadline: "zítra", deadline_anchor: undefined } : x)) } };
     const n = normalizeCaseState(legacy, ID)!.needs[0]!;
     expect([n.amount, n.amount_status, n.deadline, n.deadline_status]).toEqual([null, "UNKNOWN", null, "UNKNOWN"]);
-    console.log("ERRS", validateCaseState(normalizeCaseState(legacy, ID)!));
+    expect(validateCaseState(normalizeCaseState(legacy, ID)!)).toEqual([]);
   });
   it("HARDENING: blokovanou akci nelze dokončit ani začít; tracky jsou deterministické", () => {
     const s = build();
