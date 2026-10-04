@@ -203,24 +203,35 @@ function Section({ title, items }: { title: string; items: string[] }) {
   );
 }
 
+function GoalPanel({ a }: { a: DomeAssessment }) {
+  if (!a.user_goal?.text) return null;
+  return (
+    <div className="rounded-2xl border border-border p-5" data-testid="user-goal">
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Váš cíl</p>
+      <p className="mt-1 font-medium">{a.user_goal.text}</p>
+      {a.user_message && <p className="mt-2 text-sm leading-relaxed">{a.user_message}</p>}
+      {(a.then_actions?.length ?? 0) > 0 && (
+        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{a.then_actions!.map((t, i) => <li key={i}>• {t}</li>)}</ul>
+      )}
+    </div>
+  );
+}
+
 function AssessmentView({ a }: { a: DomeAssessment }) {
+  const nowItems = a.now_actions ?? [];
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Sparkles className="h-4 w-4" />
-          </span>
-          <p className="font-display font-semibold">Pracovní hypotéza</p>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Neověřeno
-          </span>
+      {(nowItems.length > 0 || a.primary_next_action) && (
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <p className="font-display font-semibold">Co udělat teď</p>
+          </div>
+          {a.primary_next_action && <p className="mt-4 leading-relaxed">{a.primary_next_action}</p>}
         </div>
-        <p className="mt-4 leading-relaxed">{a.hypothesis?.text}</p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Jistota: {a.confidence === "medium" ? "střední" : "nízká"} · nejde o právní posouzení
-        </p>
-      </div>
+      )}
 
       <div className="rounded-2xl bg-primary p-6 text-primary-foreground">
         <p className="text-xs font-semibold uppercase tracking-wider opacity-80">Nejdůležitější otázka</p>
@@ -228,20 +239,31 @@ function AssessmentView({ a }: { a: DomeAssessment }) {
         {a.current_question?.reason && <p className="mt-3 text-sm opacity-85">{a.current_question.reason}</p>}
       </div>
 
-      <div className="grid gap-6 rounded-2xl border border-border p-6 sm:grid-cols-2">
-        <Section title="Uvedeno" items={a.stated_by_user ?? []} />
-        <Section title="Ověřeno" items={a.verified ?? []} />
-        <Section title="K ověření" items={a.to_verify ?? []} />
-        <Section title="Chybí zjistit" items={a.missing_information ?? []} />
-        <Section title="Potřebné dokumenty" items={a.required_documents ?? []} />
-        {a.next_step?.text && (
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Možný další krok</p>
-            <p className="mt-2 text-sm">{a.next_step.text}</p>
-            {a.next_step.condition && <p className="mt-1 text-xs text-muted-foreground">Podmínka: {a.next_step.condition}</p>}
+      <details className="rounded-2xl border border-border p-6">
+        <summary className="cursor-pointer text-sm font-medium">Podrobnosti a dokumenty</summary>
+        <div className="mt-4">
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Jak to zatím chápu</p>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Neověřeno</span>
           </div>
-        )}
-      </div>
+          <p className="mt-2 text-sm leading-relaxed">{a.hypothesis?.text}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Jistota: {a.confidence === "medium" ? "střední" : "nízká"} · nejde o právní posouzení</p>
+        </div>
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <Section title="Co jste uvedl/a" items={a.stated_by_user ?? []} />
+          <Section title="Doloženo" items={a.verified ?? []} />
+          <Section title="Co může pracovník zjistit s vámi" items={a.to_verify ?? []} />
+          <Section title="Co zatím nevím" items={a.missing_information ?? []} />
+          <Section title="Dokumenty, které se mohou hodit (nejsou podmínkou)" items={a.required_documents ?? []} />
+          {a.next_step?.text && (
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Potom</p>
+              <p className="mt-2 text-sm">{a.next_step.text}</p>
+              {a.next_step.condition && <p className="mt-1 text-xs text-muted-foreground">{a.next_step.condition}</p>}
+            </div>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
@@ -254,7 +276,7 @@ function Timeline({ steps }: { steps: CaseStep[] }) {
         {steps.map((st) => {
           const Icon = st.kind === "user_input" ? User : st.kind === "user_document" ? FileText : Sparkles;
           const label = st.kind === "user_input" ? "Vy" : st.kind === "user_document" ? `Dokument: ${st.documentName ?? ""}` : "DOME";
-          const text = st.kind === "dome_assessment" ? st.assessment?.current_question?.text : st.content;
+          const text = st.kind === "dome_assessment" ? st.assessment?.current_question?.text : st.content?.replace(/^\[VOLBA UŽIVATELE[^\]]*\]\s*/, "");
           return (
             <li key={st.id} className="flex gap-4">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground">
