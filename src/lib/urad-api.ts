@@ -1,6 +1,6 @@
 import { getSupabase } from "./supabase";
 import { SCHEMA } from "./supabase-config";
-import type { InterventionLevel, Urgency } from "./dome-core";
+import type { HandoffState, InterventionLevel, Urgency } from "./dome-core";
 
 export type UradCase = {
   id: string;
@@ -175,6 +175,14 @@ export type DomeAssessment = {
   intervention_level?: InterventionLevel;
   primary_next_action?: string;
   support_path?: SupportPath;
+  // dome-core/2.0
+  user_message?: string;
+  immediate_need_gap?: { detected: boolean; needs: string[]; reason: string };
+  support_path_required?: boolean;
+  now_actions?: string[];
+  then_actions?: string[];
+  say_to_worker?: string;
+  handoff_state?: HandoffState;
 };
 
 export type SupportPath = {
@@ -191,6 +199,8 @@ export type SupportPath = {
   next_action: string;
   navigation_available: boolean;
   handoff_available: boolean;
+  verified_at?: string | null;
+  route?: { summary: string; source: string; verified_at: string } | null;
 };
 
 export type HandoffItem = {

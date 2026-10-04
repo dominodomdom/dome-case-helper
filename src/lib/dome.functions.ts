@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { SCHEMA } from "./supabase-config";
 import type { DomeAssessment, HandoffItem } from "./urad-api";
+import { enforceHandoffLabels, parseChoice, type ChoiceId } from "./dome-core";
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -42,19 +43,23 @@ async function loadCaseContext(caseId: string, accessToken: string) {
   ];
   const rows = (steps.data ?? []) as Record<string, unknown>[];
   let documents = 0;
+  const choices: ChoiceId[] = [];
   if (rows.length === 0) lines.push("(zatím žádné)");
   rows.forEach((r, i) => {
     const kind = r[s.kind];
-    if (kind === "user_input") lines.push(`${i + 1}. UŽIVATEL: ${r[s.content]}`);
-    else if (kind === "user_document") {
+    if (kind === "user_input") {
+      const ch = parseChoice(String(r[s.content] ?? ""));
+      if (ch) choices.push(ch);
+      lines.push(`${i + 1}. UŽIVATEL: ${r[s.content]}`);
+    } else if (kind === "user_document") {
       documents++;
       lines.push(`${i + 1}. UŽIVATEL NAHRÁL DOKUMENT "${r[s.documentName]}". Obsah zjištěný z dokumentu: ${r[s.content] ?? "(nepodařilo se přečíst)"}`);
     } else if (kind === "dome_assessment") {
-      const a = r[s.assessment] as { current_question?: { text?: string }; intervention_level?: string } | null;
-      lines.push(`${i + 1}. DOME (úroveň ${a?.intervention_level ?? "?"}) SE ZEPTAL: ${a?.current_question?.text ?? ""}`);
+      const a = r[s.assessment] as { current_question?: { text?: string }; intervention_level?: string; handoff_state?: string } | null;
+      lines.push(`${i + 1}. DOME (úroveň ${a?.intervention_level ?? "?"}, stav ${a?.handoff_state ?? "?"}) SE ZEPTAL: ${a?.current_question?.text ?? ""}`);
     }
   });
-  return { sb, userId, context: lines.join("\n"), documents };
+  return { sb, userId, context: lines.join("\n"), documents, choices };
 }
 
 /** Vyhodnotí celý případ a uloží nový dome_assessment přes RPC urad_record_dome_assessment. */
@@ -63,9 +68,9 @@ export const assessCase = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result<DomeAssessment>> => {
     try {
       const { generateAssessment, recordAssessment } = await import("./dome.server");
-      const { sb, context } = await loadCaseContext(data.caseId, data.accessToken);
+      const { sb, context, choices } = await loadCaseContext(data.caseId, data.accessToken);
       // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
-      const assessment = await generateAssessment(`${context}\n\nVyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.`, "urad");
+      const assessment = await generateAssessment(`${context}\n\nVyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.`, "urad", choices);
       await recordAssessment(sb, data.caseId, assessment);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
@@ -81,12 +86,10 @@ export const prepareHandoff = createServerFn({ method: "POST" })
       const { generateHandoff } = await import("./dome.server");
       const { context, documents } = await loadCaseContext(data.caseId, data.accessToken);
       const h = await generateHandoff(context);
-      const items = (h.items ?? []).map((it) => ({
-        section: String(it.section ?? ""),
-        // Bez nahraného dokumentu nemůže existovat FACT.
-        label: (documents === 0 && it.label === "FACT" ? "UNVERIFIED" : it.label ?? "UNVERIFIED") as HandoffItem["label"],
-        text: String(it.text ?? ""),
-      }));
+      const items = enforceHandoffLabels(
+        (h.items ?? []).map((it) => ({ section: String(it.section ?? ""), label: it.label, text: String(it.text ?? "") })),
+        documents,
+      ) as HandoffItem[];
       return { ok: true, data: items };
     } catch (e) {
       return fail(e);
