@@ -281,7 +281,7 @@ export function WorkerSummaryView({ items }: { items: HandoffItem[] }) {
   );
 }
 
-function SafetyCard({ reason }: { reason?: string }) {
+function SafetyCard({ reason }: { reason?: string | undefined }) {
   return (
     <div className="rounded-2xl border-2 border-destructive p-6">
       <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Bezpečí je teď na prvním místě</p>

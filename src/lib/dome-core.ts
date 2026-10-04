@@ -281,7 +281,7 @@ export const HANDOFF_SCHEMA = {
 } as const;
 
 /** FACT bez nahraného dokumentu neexistuje. */
-export function enforceHandoffLabels<T extends { label?: string }>(items: T[], documents: number): T[] {
+export function enforceHandoffLabels<T extends { label?: string | undefined }>(items: T[], documents: number): T[] {
   return items.map((it) => ({
     ...it,
     label: it.label === "FACT" && documents === 0 ? "UNVERIFIED" : (it.label ?? "UNVERIFIED"),
