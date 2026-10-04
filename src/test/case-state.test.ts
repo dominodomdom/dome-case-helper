@@ -82,6 +82,15 @@ describe("CASE CORE", () => {
     expect(s.needs[0]!.id).toBe("need_dnesni_nocleh");
     expect(s.tracks.map((t) => t.type)).toContain("SURVIVAL");
   });
+  it("nocleh se neduplikuje; lhůta z dokumentu vytvoří deadline hook", () => {
+    const s = build();
+    expect(s.needs.filter((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")).toHaveLength(1);
+    const d = buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: TEXT, documents: 1, previous: null,
+      draft: { ...draft, reality: [{ key: "lhuta", type: "FACT", text: "Odvolání lze podat do 15 dnů od doručení.", source: "DOCUMENT", need_keys: [] }] } });
+    expect(d.reality[0]!.type).toBe("FACT");
+    expect(d.links.deadlines).toHaveLength(1);
+    expect(d.links.deadlines[0]!.date).toBeNull();
+  });
   it("starší assessment se normalizuje bez pádu", () => {
     expect(normalizeCaseState(null, ID)).toBeNull();
     expect(normalizeCaseState("nesmysl", ID)).toBeNull();

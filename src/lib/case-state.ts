@@ -201,7 +201,11 @@ export function buildCaseState(input: {
     };
   });
   // Krizová pojistka z detektoru: dnešní nocleh nesmí chybět, pokud ho uživatel uvedl.
-  if (det.signals.includes("no_shelter_tonight") && !needs.some((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")) {
+  const tonight = needs.find((n) => n.category === "HOUSING" && (n.urgency === "CRITICAL" || n.urgency === "HIGH"));
+  if (det.signals.includes("no_shelter_tonight") && tonight) {
+    tonight.urgency = "CRITICAL";
+    if (!tonight.track_ids.includes("track_survival")) tonight.track_ids.push("track_survival");
+  } else if (det.signals.includes("no_shelter_tonight") && !needs.some((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")) {
     needs.unshift({
       id: "need_dnesni_nocleh", category: "HOUSING", description: "Bezpečné místo na dnešní noc", amount: null, currency: "CZK",
       urgency: "CRITICAL", deadline: null, evidence_ids: [], status: prev?.needs.find((x) => x.id === "need_dnesni_nocleh")?.status ?? "OPEN",
@@ -271,6 +275,15 @@ export function buildCaseState(input: {
       impact: pick(u.impact, UNKNOWN_IMPACTS, "MEDIUM"),
     }));
 
+  // Deadline hook (Deadline Engine = Fáze 2): lhůta zjištěná z dokumentu se jen eviduje, datum se nedopočítává.
+  const links: FutureLinks = prev?.links ? { ...prev.links, deadlines: [...prev.links.deadlines] } : { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] };
+  reality
+    .filter((r) => r.source === "DOCUMENT" && /lhůt|do\s+\d+\s+dn|odvolání/i.test(r.text))
+    .forEach((r) => {
+      const id = `dl_${r.id.slice(5)}`;
+      if (!links.deadlines.some((x) => x.id === id)) links.deadlines.push({ id, label: r.text, date: null, source: "DOCUMENT" });
+    });
+
   const state: DomeCaseState = {
     dome_case_schema_version: DOME_CASE_SCHEMA_VERSION,
     case_id: input.caseId,
@@ -280,7 +293,7 @@ export function buildCaseState(input: {
     reality,
     person: { ...emptyPerson(), ...(d.person ?? {}) },
     needs, tracks, actions, unknowns,
-    links: prev?.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] },
+    links,
     metadata: { last_updated: now, version: (prev?.metadata.version ?? 0) + 1, legacy_normalized: false, signals: det.signals },
   };
   return state;
