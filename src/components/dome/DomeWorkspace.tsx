@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { addUserInput, getAccessToken, listSteps, type CaseStep, type DomeAssessment, type UradCase } from "@/lib/urad-api";
 import { analyzeDocument, assessCase } from "@/lib/dome.functions";
-import { CHOICE_PREFIX } from "@/lib/dome-core";
+import { deriveHandoffState, formatChoice, parseChoice, type ChoiceId } from "@/lib/dome-core";
 import { SupportPathCard } from "./SupportPath";
 
 const ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
@@ -37,6 +37,18 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
   const last = list[list.length - 1];
   const latest = [...list].reverse().find((x) => x.kind === "dome_assessment")?.assessment ?? null;
   const needsAssessment = steps.isSuccess && (!last || last.kind !== "dome_assessment");
+  const level = latest?.intervention_level;
+  const urgent = level === "ACTIVE_HANDOFF" || level === "SAFETY_HANDOFF";
+  // Stejné odvození jako na serveru — volba uživatele se projeví okamžitě, i u starších hodnocení.
+  const handoffState = latest
+    ? deriveHandoffState({
+        choices: list.filter((x) => x.kind === "user_input").map((x) => parseChoice(x.content)).filter((x): x is ChoiceId => !!x),
+        gapDetected: !!latest.immediate_need_gap?.detected,
+        level: level ?? "SELF",
+        targetVerified: false,
+        routeVerified: false,
+      })
+    : "NONE";
 
   async function runAssessment() {
     setBusy("assess");
@@ -126,19 +138,14 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
         </div>
       )}
 
-      {latest && busy !== "assess" && latest.user_goal?.text && (
-        <div className="rounded-2xl border border-border p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Váš cíl</p>
-          <p className="mt-1 font-medium">{latest.user_goal.text}</p>
-          {latest.primary_next_action && <p className="mt-2 text-sm text-muted-foreground">Další krok k cíli: {latest.primary_next_action}</p>}
-        </div>
-      )}
-
       {latest && busy !== "assess" && (
-        <SupportPathCard caseId={item.id} a={latest} disabled={!!busy} onChoice={(t) => void sendText(`${CHOICE_PREFIX} ${t}`)} />
+        <>
+          {!urgent && <GoalPanel a={latest} />}
+          <SupportPathCard caseId={item.id} a={latest} state={handoffState} disabled={!!busy} onChoice={(id) => void sendText(formatChoice(id))} />
+          {urgent && <GoalPanel a={latest} />}
+          <AssessmentView a={latest} />
+        </>
       )}
-
-      {latest && busy !== "assess" && <AssessmentView a={latest} />}
 
       {error && (
         <div className="rounded-2xl border border-destructive/40 p-4 text-sm text-destructive">
