@@ -87,7 +87,7 @@ describe("CASE CORE", () => {
     expect(s.needs.filter((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")).toHaveLength(1);
     const d = buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: TEXT, documents: 1, documentNames: ["rozhodnuti.pdf"], previous: null,
       draft: { ...draft, reality: [{ key: "lhuta", type: "FACT", text: "Odvolání lze podat do 15 dnů od doručení.", source: "DOCUMENT", document_name: "rozhodnuti.pdf", need_keys: [] }] } });
-    expect(d.reality[0]!.evidence_ids).toEqual(["doc:rozhodnuti.pdf"]);
+    expect(d.reality[0]!.evidence_ids).toEqual(["document:rozhodnuti.pdf"]);
     expect(d.reality[0]!.type).toBe("FACT");
     expect(d.links.deadlines).toHaveLength(1);
     expect(d.links.deadlines[0]!.date).toBeNull();
@@ -106,14 +106,47 @@ describe("CASE CORE", () => {
     expect(validateCaseState({ ...s, reality: [{ ...s.reality[0]!, certainty: "VERIFIED" }] }).join()).toMatch(/VERIFIED jen u FACT/);
     expect(validateCaseState({ ...s, actions: s.actions.map((a, i) => (i === 0 ? { ...a, status: "WAITING" as const, status_reason: null } : a)) }).join()).toMatch(/chybí důvod/);
   });
-  it("HARDENING: částka a lhůta jen pokud zazněly (AMOUNT_UNKNOWN / DEADLINE_UNKNOWN)", () => {
-    const n = (amount: any, deadline: any, text = TEXT) => buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: text, documents: 0, previous: null,
-      draft: { ...draft, needs: [{ key: "k", category: "FOOD", description: "jídlo", amount, urgency: "HIGH", deadline, tracks: [] }], actions: [] } }).needs.find((x) => x.id === "need_k")!;
-    expect(n(1500, null).amount).toBeNull(); // vymyšlená částka
-    expect(n(5000, null, "Potřebuji 5 000 Kč na nájem").amount).toBe(5000);
-    expect(n(null, "15. 11. 2026").deadline).toBeNull(); // vymyšlená lhůta
-    expect(n(null, "do 15 dnů", "odvolání do 15 dnů").deadline).toBe("do 15 dnů");
-    expect(n(-3, null).amount).toBeNull();
+  const need1 = (n: any, text = TEXT, extra: any[] = [], actions: any[] = []) => buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: text, documents: 0, previous: null,
+    draft: { ...draft, needs: [{ key: "k", category: "FOOD", description: "jídlo", amount: null, urgency: "HIGH", deadline: null, tracks: [], ...n }, ...extra], actions } }).needs.find((x) => x.id === "need_k")!;
+  it("AMOUNT BINDING: jen MENTION → NEED → AMOUNT, jinak null/UNKNOWN", () => {
+    const T = "Potřebuji 5 000 Kč na nájem. Na jídlo mi chybí 800 Kč.";
+    expect(need1({ amount: 5000, amount_mention: null }, T).amount).toBeNull(); // číslo v textu nestačí
+    const ok = need1({ amount: 5000, amount_mention: "Potřebuji 5 000 Kč na nájem" }, T);
+    expect([ok.amount, ok.amount_status, ok.amount_mention]).toEqual([5000, "KNOWN", "potřebuji 5 000 kč na nájem"]);
+    expect(need1({ amount: 800, amount_mention: "Potřebuji 5 000 Kč na nájem" }, T).amount).toBeNull(); // citace s jinou částkou
+    expect(need1({ amount: 5000, amount_mention: "Potřebuji 5 000 Kč na nájem. Na jídlo mi chybí 800 Kč" }, T).amount).toBeNull(); // dvě čísla = nejednoznačné
+    expect(need1({ amount: 5000, amount_mention: "Potřebuji 5 000 Kč na pivo" }, T).amount).toBeNull(); // citace neexistuje
+    const shared = need1({ amount: 5000, amount_mention: "Potřebuji 5 000 Kč na nájem" }, T,
+      [{ key: "j", category: "HOUSING", description: "nájem", amount: 5000, amount_mention: "Potřebuji 5 000 Kč na nájem", urgency: "HIGH", deadline: null, tracks: [] }]);
+    expect([shared.amount, shared.amount_status]).toEqual([null, "UNKNOWN"]); // stejná citace u dvou potřeb
+  });
+  it("DEADLINE BINDING: lhůta jen s citací a vazbou NEED/ACTION/EVENT/PROCEDURE", () => {
+    const T = "Odvolání lze podat do 15 dnů od doručení. Nájem musím zaplatit do pátku.";
+    expect(need1({ deadline: "do 15 dnů", deadline_mention: "Odvolání lze podat do 15 dnů od doručení" }, T).deadline).toBeNull(); // bez vazby
+    const p = need1({ deadline: "do 15 dnů", deadline_mention: "Odvolání lze podat do 15 dnů od doručení", deadline_anchor: { type: "PROCEDURE", key: "Odvolání proti rozhodnutí" } }, T);
+    expect([p.deadline, p.deadline_status, p.deadline_anchor]).toEqual(["do 15 dnů", "KNOWN", { type: "PROCEDURE", ref: "Odvolání proti rozhodnutí" }]);
+    expect(need1({ deadline: "do pátku", deadline_mention: "Nájem musím zaplatit do pátku", deadline_anchor: { type: "NEED", key: "k" } }, T).deadline_anchor).toEqual({ type: "NEED", ref: "need_k" });
+    expect(need1({ deadline: "do pátku", deadline_mention: "Nájem musím zaplatit do pátku", deadline_anchor: { type: "NEED", key: "jina" } }, T).deadline).toBeNull(); // cizí potřeba
+    expect(need1({ deadline: "do pátku", deadline_mention: "Nájem musím zaplatit do pátku", deadline_anchor: { type: "ACTION", key: "neexistuje" } }, T).deadline).toBeNull();
+    expect(need1({ deadline: "do pátku", deadline_mention: "Nájem musím zaplatit do pátku", deadline_anchor: { type: "ACTION", key: "zaplatit" } }, T, [],
+      [{ key: "zaplatit", title: "Zaplatit nájem", description: "", type: "GENERAL", priority: "THIS_WEEK", track: null, need_keys: [], depends_on: [] }]).deadline_anchor).toEqual({ type: "ACTION", ref: "act_zaplatit" });
+    expect(need1({ deadline: "15. 11. 2026", deadline_mention: "Nájem musím zaplatit do pátku", deadline_anchor: { type: "NEED", key: "k" } }, T).deadline).toBeNull(); // lhůta není v citaci
+    expect(need1({ deadline: "do 15 dnů", deadline_mention: "Odvolání lze podat do 15 dnů od doručení", deadline_anchor: { type: "EVENT", key: "" } }, T).deadline).toBeNull();
+  });
+  it("EVIDENCE BOUNDARY: FACT vyžaduje ověřitelnou evidenci libovolného druhu, kterou server zná", () => {
+    const mk = (r: any, ev: any[] = []) => buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: TEXT, documents: 0, verifiableEvidence: ev, previous: null, draft: { ...draft, reality: [r] } }).reality[0]!;
+    const off = mk({ key: "a", type: "FACT", text: "x", source: "OFFICIAL_SOURCE", evidence: { kind: "OFFICIAL_SOURCE", ref: "MPSV:zivotni-minimum" }, need_keys: [] }, [{ kind: "OFFICIAL_SOURCE", ref: "MPSV:zivotni-minimum" }]);
+    expect([off.type, off.source, off.evidence_ids]).toEqual(["FACT", "OFFICIAL_SOURCE", ["official_source:mpsv:zivotni-minimum"]]);
+    expect(mk({ key: "a", type: "FACT", text: "x", source: "SYSTEM", evidence: { kind: "SYSTEM_RECORD", ref: "r1" }, need_keys: [] }, [{ kind: "SYSTEM_RECORD", ref: "r1" }]).source).toBe("SYSTEM");
+    expect(mk({ key: "a", type: "FACT", text: "x", source: "OFFICIAL_SOURCE", evidence: { kind: "OFFICIAL_SOURCE", ref: "neznamy" }, need_keys: [] }).type).toBe("VERIFICATION"); // neověřitelný odkaz
+    expect(mk({ key: "a", type: "FACT", text: "x", source: "USER", evidence: { kind: "SYSTEM_RECORD", ref: "r1" }, need_keys: [] }, [{ kind: "SYSTEM_RECORD", ref: "r1" }]).type).toBe("CLAIM"); // USER nikdy FACT
+  });
+  it("LEGACY: uložená částka/lhůta bez vazby se při načtení stane UNKNOWN", () => {
+    const s = build();
+    const legacy = { case_state: { ...s, needs: s.needs.map((x, i) => (i === 0 ? { ...x, amount: 1500, amount_mention: undefined, deadline: "zítra", deadline_anchor: undefined } : x)) } };
+    const n = normalizeCaseState(legacy, ID)!.needs[0]!;
+    expect([n.amount, n.amount_status, n.deadline, n.deadline_status]).toEqual([null, "UNKNOWN", null, "UNKNOWN"]);
+    expect(validateCaseState(normalizeCaseState(legacy, ID)!)).toEqual([]);
   });
   it("HARDENING: blokovanou akci nelze dokončit ani začít; tracky jsou deterministické", () => {
     const s = build();

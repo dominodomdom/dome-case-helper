@@ -13,6 +13,14 @@ export const REALITY_TYPES = ["FACT", "CLAIM", "INTERPRETATION", "VERIFICATION"]
 export const CERTAINTIES = ["VERIFIED", "LIKELY", "POSSIBLE", "UNKNOWN", "NOT_AVAILABLE"] as const;
 export const REALITY_SOURCES = ["USER", "DOCUMENT", "OFFICIAL_SOURCE", "SYSTEM", "OTHER"] as const;
 export const NEED_CATEGORIES = ["HOUSING", "FOOD", "HYGIENE", "TRANSPORT", "HEALTH", "DOCUMENT", "INCOME", "LEGAL", "EDUCATION", "OTHER"] as const;
+/** Druhy ověřitelné evidence. FACT vyžaduje evidenci, kterou server umí doložit (ne jen tvrzení modelu). */
+export const EVIDENCE_KINDS = ["DOCUMENT", "OFFICIAL_SOURCE", "SYSTEM_RECORD", "OTHER_VERIFIABLE_SOURCE"] as const;
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
+/** Ověřitelný podklad dostupný serveru. DOCUMENT = nahraný dokument; ostatní druhy dodá až Evidence Engine (Fáze 2) — boundary hook. */
+export type VerifiableEvidence = { kind: EvidenceKind; ref: string };
+export const DEADLINE_ANCHORS = ["NEED", "ACTION", "EVENT", "PROCEDURE"] as const;
+export type DeadlineAnchorType = (typeof DEADLINE_ANCHORS)[number];
+export const evidenceId = (e: VerifiableEvidence) => `${e.kind.toLowerCase()}:${e.ref.toLowerCase().trim()}`;
 export const NEED_URGENCIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"] as const;
 export const NEED_STATUSES = ["OPEN", "PARTIALLY_COVERED", "COVERED", "UNKNOWN"] as const;
 export const TRACK_TYPES = ["SURVIVAL", "ADMINISTRATIVE", "HOUSING", "INCOME", "SUPPORT"] as const;
@@ -64,9 +72,16 @@ export type Need = {
   category: NeedCategory;
   description: string;
   amount: number | null; // null = AMOUNT_UNKNOWN
+  amount_status: "KNOWN" | "UNKNOWN";
+  /** Přesná citace, ze které částka pochází (MENTION → NEED → AMOUNT). */
+  amount_mention: string | null;
   currency: "CZK";
   urgency: NeedUrgency;
   deadline: string | null; // null = DEADLINE_UNKNOWN
+  deadline_status: "KNOWN" | "UNKNOWN";
+  deadline_mention: string | null;
+  /** K čemu se lhůta váže. Hook pro Deadline Engine (Fáze 2). */
+  deadline_anchor: { type: DeadlineAnchorType; ref: string } | null;
   evidence_ids: string[];
   status: NeedStatus;
   track_ids: string[];
@@ -151,9 +166,12 @@ export const emptyPerson = (): PersonMap => ({
 
 /* ---------- Vstup od modelu (draft s klíči místo ID) ---------- */
 export type CaseDraft = {
-  reality: { key: string; type: string; text: string; source: string; document_name?: string | null; need_keys: string[] }[];
+  reality: { key: string; type: string; text: string; source: string; document_name?: string | null; evidence?: { kind: string; ref: string } | null; need_keys: string[] }[];
   person: PersonMap;
-  needs: { key: string; category: string; description: string; amount: number | null; urgency: string; deadline: string | null; tracks: string[] }[];
+  needs: {
+    key: string; category: string; description: string; amount: number | null; amount_mention?: string | null; urgency: string;
+    deadline: string | null; deadline_mention?: string | null; deadline_anchor?: { type: string; key: string } | null; tracks: string[];
+  }[];
   actions: { key: string; title: string; description: string; type: string; priority: string; track: string | null; need_keys: string[]; depends_on: string[] }[];
   unknowns: { key: string; question: string; why_it_matters: string; need_keys: string[]; impact: string }[];
 };
@@ -175,27 +193,61 @@ export function buildCaseState(input: {
   documents: number;
   /** Názvy skutečně nahraných dokumentů (FACT musí odkazovat na jeden z nich). */
   documentNames?: string[];
-  /** Text, ze kterého smí pocházet částky a lhůty (výroky uživatele + obsah dokumentů). */
+  /** Text, ze kterého smí pocházet citace částek a lhůt (výroky uživatele + obsah dokumentů). */
   evidenceText?: string;
+  /** Další ověřitelné podklady mimo dokumenty (Evidence Engine hook; zatím vždy prázdné). */
+  verifiableEvidence?: VerifiableEvidence[];
   previous: DomeCaseState | null;
   now?: Date;
 }): DomeCaseState {
-  const evidence = (input.evidenceText ?? input.userText).toLowerCase();
-  const digits = (x: string) => x.replace(/\D/g, "");
-  const evidenceDigits = evidence.replace(/(\d)[\s.\u00a0](?=\d{3}\b)/g, "$1"); // 5 000 / 5.000 → 5000
-  /** Částka jen pokud číslo skutečně zaznělo — jinak AMOUNT_UNKNOWN (null). */
-  const groundedAmount = (v: unknown): number | null => {
-    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return null;
-    return new RegExp(`(^|\\D)${Math.round(v)}(\\D|$)`).test(evidenceDigits) ? v : null;
+  const norm = (x: string) => x.toLowerCase().replace(/\s+/g, " ").trim();
+  const evidence = norm(input.evidenceText ?? input.userText);
+  const joinThousands = (x: string) => x.replace(/(\d)[\s.\u00a0](?=\d{3}\b)/g, "$1"); // 5 000 / 5.000 → 5000
+  const numbersIn = (x: string) => [...new Set(joinThousands(x).match(/\d+/g) ?? [])];
+  /** Citace musí doslova existovat ve výrocích uživatele / obsahu dokumentu. */
+  const quoted = (m: unknown): string | null => (typeof m === "string" && m.trim().length >= 3 && evidence.includes(norm(m)) ? norm(m) : null);
+  // Seznam ověřitelných podkladů: nahrané dokumenty + případné další ověřené zdroje (hook).
+  const verifiable = new Set([
+    ...(input.documentNames ?? []).filter(Boolean).map((n) => evidenceId({ kind: "DOCUMENT", ref: n })),
+    ...(input.verifiableEvidence ?? []).map(evidenceId),
+  ]);
+  const rawNeeds = (d0: Partial<CaseDraft>) => d0.needs ?? [];
+
+  /** AMOUNT: MENTION → NEED → AMOUNT. Jinak null/UNKNOWN. */
+  const amountMentions = new Map<string, number>();
+  rawNeeds(input.draft ?? {}).forEach((n) => { const q = quoted(n.amount_mention); if (q) amountMentions.set(q, (amountMentions.get(q) ?? 0) + 1); });
+  const bindAmount = (n: CaseDraft["needs"][number]): { amount: number | null; mention: string | null } => {
+    const v = n.amount;
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return { amount: null, mention: null };
+    const q = quoted(n.amount_mention);
+    if (!q || amountMentions.get(q) !== 1) return { amount: null, mention: null }; // žádná / sdílená citace = nejednoznačné
+    const nums = numbersIn(q);
+    if (nums.length !== 1 || nums[0] !== String(Math.round(v))) return { amount: null, mention: null }; // citace musí obsahovat právě tuto jednu částku
+    return { amount: v, mention: q };
   };
-  /** Lhůta jen pokud její text / čísla zazněly — jinak DEADLINE_UNKNOWN (null). */
-  const groundedDeadline = (v: unknown): string | null => {
-    if (typeof v !== "string" || !v.trim()) return null;
-    const dg = digits(v);
-    if (dg) return dg.split("").length > 0 && v.match(/\d+/g)!.every((n) => evidence.includes(n)) ? v.trim() : null;
-    return evidence.includes(v.trim().toLowerCase()) ? v.trim() : null;
+
+  /** DEADLINE: MENTION → (NEED | ACTION | EVENT | PROCEDURE) → DEADLINE. Jinak null/UNKNOWN. */
+  const deadlineMentions = new Map<string, number>();
+  rawNeeds(input.draft ?? {}).forEach((n) => { const q = quoted(n.deadline_mention); if (q) deadlineMentions.set(q, (deadlineMentions.get(q) ?? 0) + 1); });
+  const draftActionIds = new Set((input.draft?.actions ?? []).map((a) => `act_${slug(a.key || a.title)}`));
+  const bindDeadline = (n: CaseDraft["needs"][number], needId: string): { deadline: string | null; mention: string | null; anchor: Need["deadline_anchor"] } => {
+    const none = { deadline: null, mention: null, anchor: null };
+    if (typeof n.deadline !== "string" || !n.deadline.trim()) return none;
+    const q = quoted(n.deadline_mention);
+    if (!q || deadlineMentions.get(q) !== 1) return none;
+    const dl = norm(n.deadline);
+    const dn = numbersIn(dl);
+    if (!(q.includes(dl) || (dn.length > 0 && dn.every((x) => numbersIn(q).includes(x))))) return none;
+    const at = n.deadline_anchor;
+    if (!at || !DEADLINE_ANCHORS.includes(at.type as DeadlineAnchorType)) return none;
+    const key = typeof at.key === "string" ? at.key.trim() : "";
+    let ref: string | null = null;
+    if (at.type === "NEED") ref = !key || `need_${slug(key)}` === needId ? needId : null;
+    else if (at.type === "ACTION") ref = key && draftActionIds.has(`act_${slug(key)}`) ? `act_${slug(key)}` : null;
+    else ref = key || null; // EVENT / PROCEDURE: pojmenovaná událost / řízení
+    if (!ref) return none;
+    return { deadline: n.deadline.trim(), mention: q, anchor: { type: at.type as DeadlineAnchorType, ref } };
   };
-  const docNames = (input.documentNames ?? []).map((n) => n.toLowerCase());
   const now = (input.now ?? new Date()).toISOString();
   const d = input.draft ?? {};
   const prev = input.previous;
@@ -205,14 +257,16 @@ export function buildCaseState(input: {
   const needs: Need[] = (d.needs ?? []).map((n) => {
     const id = `need_${slug(n.key || n.description)}`;
     const old = prev?.needs.find((x) => x.id === id);
+    const am = bindAmount(n);
+    const dl = bindDeadline(n, id);
     return {
       id,
       category: pick(n.category, NEED_CATEGORIES, "OTHER"),
       description: String(n.description ?? ""),
-      amount: groundedAmount(n.amount),
+      amount: am.amount, amount_status: am.amount === null ? "UNKNOWN" : "KNOWN", amount_mention: am.mention,
       currency: "CZK",
       urgency: pick(n.urgency, NEED_URGENCIES, "UNKNOWN"),
-      deadline: groundedDeadline(n.deadline),
+      deadline: dl.deadline, deadline_status: dl.deadline === null ? "UNKNOWN" : "KNOWN", deadline_mention: dl.mention, deadline_anchor: dl.anchor,
       evidence_ids: [],
       status: old?.status ?? "OPEN",
       track_ids: (n.tracks ?? []).filter((t) => TRACK_TYPES.includes(t as TrackType)).map((t) => `track_${t.toLowerCase()}`),
@@ -227,8 +281,8 @@ export function buildCaseState(input: {
     if (!tonight.track_ids.includes("track_survival")) tonight.track_ids.push("track_survival");
   } else if (det.signals.includes("no_shelter_tonight") && !needs.some((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")) {
     needs.unshift({
-      id: "need_dnesni_nocleh", category: "HOUSING", description: "Bezpečné místo na dnešní noc", amount: null, currency: "CZK",
-      urgency: "CRITICAL", deadline: null, evidence_ids: [], status: prev?.needs.find((x) => x.id === "need_dnesni_nocleh")?.status ?? "OPEN",
+      id: "need_dnesni_nocleh", category: "HOUSING", description: "Bezpečné místo na dnešní noc", amount: null, amount_status: "UNKNOWN", amount_mention: null, currency: "CZK",
+      urgency: "CRITICAL", deadline: null, deadline_status: "UNKNOWN", deadline_mention: null, deadline_anchor: null, evidence_ids: [], status: prev?.needs.find((x) => x.id === "need_dnesni_nocleh")?.status ?? "OPEN",
       track_ids: ["track_survival"], route_ids: [], created_at: prevCreated("need_dnesni_nocleh", prev?.needs),
     });
   }
@@ -252,16 +306,19 @@ export function buildCaseState(input: {
   const reality: RealityItem[] = (d.reality ?? []).map((r) => {
     let type = pick(r.type, REALITY_TYPES, "CLAIM");
     let source = pick(r.source, REALITY_SOURCES, "USER");
-    // CLAIM ≠ FACT: FACT jen s evidencí = odkaz na skutečně nahraný dokument. Jinak CLAIM (od uživatele) / VERIFICATION.
-    const docRef = typeof r.document_name === "string" ? r.document_name.toLowerCase().trim() : "";
-    const doc = docRef && docNames.includes(docRef) ? docRef : null;
-    if (source === "DOCUMENT" && !doc) source = "OTHER";
-    if (type === "FACT" && !doc) type = source === "USER" ? "CLAIM" : "VERIFICATION";
-    if (source === "OFFICIAL_SOURCE") source = "OTHER"; // žádný oficiální zdroj zatím není napojen
+    // CLAIM ≠ FACT: FACT jen s ověřitelnou evidencí, kterou server zná (dokument / oficiální zdroj / systémový záznam / jiný ověřitelný zdroj).
+    const claimed: VerifiableEvidence | null = r.evidence && EVIDENCE_KINDS.includes(r.evidence.kind as EvidenceKind) && typeof r.evidence.ref === "string"
+      ? { kind: r.evidence.kind as EvidenceKind, ref: r.evidence.ref }
+      : typeof r.document_name === "string" && r.document_name.trim() ? { kind: "DOCUMENT", ref: r.document_name } : null;
+    const evId = claimed && verifiable.has(evidenceId(claimed)) ? evidenceId(claimed) : null;
+    if (source === "USER" && type === "FACT") type = "CLAIM"; // tvrzení uživatele se nikdy samo nestane FACT
+    if (type === "FACT" && !evId) type = source === "USER" ? "CLAIM" : "VERIFICATION";
+    if (type === "FACT" && claimed) source = claimed.kind === "DOCUMENT" ? "DOCUMENT" : claimed.kind === "OFFICIAL_SOURCE" ? "OFFICIAL_SOURCE" : claimed.kind === "SYSTEM_RECORD" ? "SYSTEM" : "OTHER";
+    else if (source !== "USER" && source !== "SYSTEM") source = "OTHER"; // nedoložený zdroj se nevydává za dokument/úřad
     const certainty: Certainty = type === "FACT" ? "VERIFIED" : type === "VERIFICATION" ? "UNKNOWN" : "POSSIBLE";
     const id = `real_${slug(r.key || r.text)}`;
     return {
-      id, type, text: String(r.text ?? ""), certainty, source, evidence_ids: type === "FACT" && doc ? [`doc:${doc}`] : [],
+      id, type, text: String(r.text ?? ""), certainty, source, evidence_ids: type === "FACT" && evId ? [evId] : [],
       related_need_ids: (r.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)), related_route_ids: [],
       created_at: prevCreated(id, prev?.reality),
     };
@@ -339,7 +396,8 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if (!REALITY_TYPES.includes(r.type)) e.push(`reality ${r.id}: type`);
     if (!CERTAINTIES.includes(r.certainty)) e.push(`reality ${r.id}: certainty`);
     if (r.type === "FACT" && r.source === "USER") e.push(`reality ${r.id}: tvrzení uživatele nesmí být FACT`);
-    if (r.type === "FACT" && (r.evidence_ids.length === 0 || r.certainty !== "VERIFIED")) e.push(`reality ${r.id}: FACT bez evidence`);
+    if (r.type === "FACT" && (r.evidence_ids.length === 0 || r.certainty !== "VERIFIED" || !r.evidence_ids.every((x) => EVIDENCE_KINDS.some((k) => x.startsWith(`${k.toLowerCase()}:`)))))
+      e.push(`reality ${r.id}: FACT bez evidence`);
     if (r.type !== "FACT" && r.certainty === "VERIFIED") e.push(`reality ${r.id}: VERIFIED jen u FACT`);
     r.related_need_ids.forEach((x) => needIds.has(x) || e.push(`reality ${r.id}: neznámá potřeba ${x}`));
   });
@@ -349,6 +407,9 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if (!NEED_URGENCIES.includes(n.urgency)) e.push(`need ${n.id}: urgency`);
     if (!NEED_STATUSES.includes(n.status)) e.push(`need ${n.id}: status`);
     if (n.amount !== null && !(typeof n.amount === "number" && n.amount > 0)) e.push(`need ${n.id}: amount`);
+    if ((n.amount === null) !== (n.amount_status === "UNKNOWN") || (n.amount !== null && !n.amount_mention)) e.push(`need ${n.id}: částka bez vazby`);
+    if ((n.deadline === null) !== (n.deadline_status === "UNKNOWN") || (n.deadline !== null && (!n.deadline_mention || !n.deadline_anchor || !DEADLINE_ANCHORS.includes(n.deadline_anchor.type))))
+      e.push(`need ${n.id}: lhůta bez vazby`);
     n.track_ids.forEach((x) => trackIds.has(x) || e.push(`need ${n.id}: neznámý track ${x}`));
   });
   s.tracks.forEach((t) => { uniq(t.id); if (!TRACK_TYPES.includes(t.type)) e.push(`track ${t.id}: type`); });
@@ -413,7 +474,7 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
     const a = assessment as Record<string, unknown>;
     const cs = a["case_state"] as DomeCaseState | undefined;
     if (cs && cs.dome_case_schema_version === DOME_CASE_SCHEMA_VERSION && Array.isArray(cs.actions)) {
-      return { ...cs, person: { ...emptyPerson(), ...(cs.person ?? {}) }, links: cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] }, unknowns: cs.unknowns ?? [], reality: cs.reality ?? [], needs: cs.needs ?? [], tracks: cs.tracks ?? [] };
+      return { ...cs, person: { ...emptyPerson(), ...(cs.person ?? {}) }, links: cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] }, unknowns: cs.unknowns ?? [], reality: cs.reality ?? [], needs: (cs.needs ?? []).map(normalizeNeed), tracks: cs.tracks ?? [] };
     }
     // Legacy (dome-core 1.x/2.0): převedeme jen to, co v něm skutečně je — bez akcí a bez vymýšlení.
     const arr = (k: string) => (Array.isArray(a[k]) ? (a[k] as unknown[]).map(String) : []);
@@ -445,3 +506,15 @@ export interface CaseEngine {
   apply(state: DomeCaseState): Promise<DomeCaseState>;
 }
 export const CASE_ENGINES: CaseEngine[] = []; // Fáze 1: žádný engine není aktivní
+
+/** Uložená potřeba ze starší verze 1.0 bez vazby částky/lhůty → UNKNOWN (deterministicky, nic se nedomýšlí). */
+function normalizeNeed(n: Need): Need {
+  const am = typeof n.amount === "number" && n.amount_mention ? n.amount : null;
+  const dlOk = typeof n.deadline === "string" && n.deadline_mention && n.deadline_anchor;
+  return {
+    ...n,
+    amount: am, amount_status: am === null ? "UNKNOWN" : "KNOWN", amount_mention: am === null ? null : n.amount_mention,
+    deadline: dlOk ? n.deadline : null, deadline_status: dlOk ? "KNOWN" : "UNKNOWN",
+    deadline_mention: dlOk ? n.deadline_mention : null, deadline_anchor: dlOk ? n.deadline_anchor : null,
+  };
+}

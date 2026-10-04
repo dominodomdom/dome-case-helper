@@ -59,4 +59,36 @@ Starší assessments se čtou přes `normalizeCaseState` (označeny `legacy_norm
 ## I. RECOMMENDATION
 Přijmout Fázi 1. Před nebo během Fáze 2 se rozhodnout o atomické kontrole verze v RPC (C1) a provést ruční test v účtu (vytvořit případ, Hotovo, Čekám s důvodem, obnovit stránku).
 
-READY_WITH_WARNINGS
+READY_WITH_WARNINGS (gate v1.0 — nahrazeno finálním stavem v sekci O)
+
+---
+
+# PHASE 1 FINAL ACCEPTANCE PATCH
+
+## J. FINAL PATCHES
+- Bez změny DB schématu, RLS, RPC kontraktu a autorizačního modelu. Fáze 2 (Evidence/Timeline/Deadline Engine) neimplementována — jen boundary hooks.
+- `case-state.ts`: `EVIDENCE_KINDS`, `VerifiableEvidence`, `evidenceId`, vstup `verifiableEvidence` (hook pro Evidence Engine, zatím prázdný); `Need.amount_status/amount_mention`, `Need.deadline_status/deadline_mention/deadline_anchor`; `DEADLINE_ANCHORS`; validace vazeb; `normalizeNeed` pro dříve uložené stavy 1.0.
+- `dome-core.ts`: strukturované schéma a instrukce pro `evidence`, `amount_mention`, `deadline_mention`, `deadline_anchor`.
+- Původní textová heuristika („číslo se v textu vyskytuje") odstraněna.
+- Kontroly v tomto kole: type check OK, 47/47 automatických testů OK (z toho 4 nové: amount binding, deadline binding, evidence boundary, legacy normalizace vazeb), produkční build OK.
+
+## K. LIVE ACCOUNT TEST
+**NEPROVEDEN.** Kroky A–J nebyly spuštěny.
+Důvod: aplikace používá vaše vlastní externí přihlášení; testovací prostředí nemá žádnou přihlášenou relaci ani schválený účet a nemohu si ho samo vytvořit (registrace vyžaduje potvrzení e-mailem a schválení administrátorem). Nic z kroků A–J proto nemohu vykázat jako prošlé.
+Potřebné ruční kroky (ve schváleném účtu):
+A. vytvořit případ · B. akci → Hotovo · C. akci → Čekám + důvod · D. akci → Nejde to + důvod · E. obnovit stránku · F. odhlásit/přihlásit · G. ověřit, že B–D zůstaly · H. spustit nové vyhodnocení · I. ověřit, že B–D zůstaly i po něm · J. otevřít případ ve dvou záložkách, v jedné změnit akci, ve druhé změnit jinou → druhá musí zobrazit „Stav případu se mezitím změnil. Obnovte stránku."
+Automaticky ověřeno jen bez reálného ukládání: zachování stavů akcí při novém vyhodnocení (testy logiky), dialogy důvodu, zámek závislostí a zobrazení konfliktu verze (UI testy s napodobeným serverem).
+
+## L. EVIDENCE BOUNDARY
+FACT = vyžaduje ověřitelnou evidenci: `DOCUMENT | OFFICIAL_SOURCE | SYSTEM_RECORD | OTHER_VERIFIABLE_SOURCE`. Odkaz od modelu se přijme jen, pokud ho server zná v seznamu ověřitelných podkladů (nahrané dokumenty + hook `verifiableEvidence`). Evidence id `<druh>:<odkaz>`. Výrok uživatele (source USER) nikdy nedostane FACT, ani s evidencí. Neověřitelný odkaz → VERIFICATION. Validace odmítne FACT bez evidence nebo s neznámým druhem. Dnes je reálně dostupný jen DOCUMENT; ostatní druhy čekají na Evidence Engine. **Splněno.**
+
+## M. AMOUNT BINDING
+Částka platí jen s vazbou MENTION → NEED → AMOUNT: doslovná citace (`amount_mention`) musí existovat ve výrocích uživatele nebo v obsahu dokumentu, obsahovat právě jedno číslo a to musí odpovídat částce; stejná citace u více potřeb = nejednoznačné. Jinak `amount = null`, `amount_status = UNKNOWN`. Dříve uložené částky bez citace se při načtení mění na UNKNOWN. **Splněno.**
+
+## N. DEADLINE BINDING
+Lhůta platí jen s citací (`deadline_mention`) obsahující lhůtu a s vazbou `deadline_anchor` na NEED (jen tuto potřebu), ACTION (existující akci), EVENT nebo PROCEDURE (pojmenované). Sdílená citace, chybějící/neznámá vazba → `deadline = null`, `deadline_status = UNKNOWN`. Datum se nedopočítává (Deadline Engine = Fáze 2). **Splněno.**
+
+## O. FINAL ACCEPTANCE
+Body 1–3 splněny a ověřeny automatickými testy. Povinný live smoke test (bod 6) nebyl proveden, takže podmínka pro READY_FOR_PHASE_2 není splněna a Fáze 2 se nespouští. Po úspěšném provedení kroků K.A–K.J lze stav změnit na READY_FOR_PHASE_2.
+
+BLOCKED
