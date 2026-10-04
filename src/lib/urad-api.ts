@@ -111,7 +111,7 @@ export async function getMyAccess(): Promise<MyAccess | null> {
 export async function listCases(): Promise<UradCase[]> {
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
-    .select("*")
+    .select(CASE_SELECT)
     .order(c.createdAt, { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapCase);
@@ -120,7 +120,7 @@ export async function listCases(): Promise<UradCase[]> {
 export async function getCase(id: string): Promise<UradCase | null> {
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
-    .select("*")
+    .select(CASE_SELECT)
     .eq(c.id, id)
     .maybeSingle();
   if (error) throw error;
@@ -133,7 +133,7 @@ export async function createCase(input: { title: string; description: string }) 
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
     .insert({ [c.ownerId]: user.id, [c.title]: input.title, [c.description]: input.description })
-    .select("*")
+    .select(CASE_SELECT)
     .single();
   if (error) throw error;
   return mapCase(data);
