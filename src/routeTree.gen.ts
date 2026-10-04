@@ -10,33 +10,120 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChranenoRouteRouteImport } from './routes/_chraneno/route'
+import { Route as CekaniRouteImport } from './routes/cekani'
+import { Route as PrihlaseniRouteImport } from './routes/prihlaseni'
+import { Route as RegistraceRouteImport } from './routes/registrace'
+import { Route as ChranenoPraceRouteImport } from './routes/_chraneno/prace'
+import { Route as ChranenoPripadyIdRouteImport } from './routes/_chraneno/pripady.$id'
+import { Route as ChranenoPripadyNovyRouteImport } from './routes/_chraneno/pripady.novy'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChranenoRouteRoute = ChranenoRouteRouteImport.update({
+  id: '/_chraneno',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CekaniRoute = CekaniRouteImport.update({
+  id: '/cekani',
+  path: '/cekani',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrihlaseniRoute = PrihlaseniRouteImport.update({
+  id: '/prihlaseni',
+  path: '/prihlaseni',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistraceRoute = RegistraceRouteImport.update({
+  id: '/registrace',
+  path: '/registrace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChranenoPraceRoute = ChranenoPraceRouteImport.update({
+  id: '/prace',
+  path: '/prace',
+  getParentRoute: () => ChranenoRouteRoute,
+} as any)
+const ChranenoPripadyIdRoute = ChranenoPripadyIdRouteImport.update({
+  id: '/pripady/$id',
+  path: '/pripady/$id',
+  getParentRoute: () => ChranenoRouteRoute,
+} as any)
+const ChranenoPripadyNovyRoute = ChranenoPripadyNovyRouteImport.update({
+  id: '/pripady/novy',
+  path: '/pripady/novy',
+  getParentRoute: () => ChranenoRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cekani': typeof CekaniRoute
+  '/prihlaseni': typeof PrihlaseniRoute
+  '/registrace': typeof RegistraceRoute
+  '/prace': typeof ChranenoPraceRoute
+  '/pripady/$id': typeof ChranenoPripadyIdRoute
+  '/pripady/novy': typeof ChranenoPripadyNovyRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cekani': typeof CekaniRoute
+  '/prihlaseni': typeof PrihlaseniRoute
+  '/registrace': typeof RegistraceRoute
+  '/prace': typeof ChranenoPraceRoute
+  '/pripady/$id': typeof ChranenoPripadyIdRoute
+  '/pripady/novy': typeof ChranenoPripadyNovyRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_chraneno': typeof ChranenoRouteRouteWithChildren
+  '/cekani': typeof CekaniRoute
+  '/prihlaseni': typeof PrihlaseniRoute
+  '/registrace': typeof RegistraceRoute
+  '/_chraneno/prace': typeof ChranenoPraceRoute
+  '/_chraneno/pripady/$id': typeof ChranenoPripadyIdRoute
+  '/_chraneno/pripady/novy': typeof ChranenoPripadyNovyRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/cekani'
+    | '/prihlaseni'
+    | '/registrace'
+    | '/prace'
+    | '/pripady/$id'
+    | '/pripady/novy'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/cekani'
+    | '/prihlaseni'
+    | '/registrace'
+    | '/prace'
+    | '/pripady/$id'
+    | '/pripady/novy'
+  id:
+    | '__root__'
+    | '/'
+    | '/_chraneno'
+    | '/cekani'
+    | '/prihlaseni'
+    | '/registrace'
+    | '/_chraneno/prace'
+    | '/_chraneno/pripady/$id'
+    | '/_chraneno/pripady/novy'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChranenoRouteRoute: typeof ChranenoRouteRouteWithChildren
+  CekaniRoute: typeof CekaniRoute
+  PrihlaseniRoute: typeof PrihlaseniRoute
+  RegistraceRoute: typeof RegistraceRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +135,80 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_chraneno': {
+      id: '/_chraneno'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ChranenoRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cekani': {
+      id: '/cekani'
+      path: '/cekani'
+      fullPath: '/cekani'
+      preLoaderRoute: typeof CekaniRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/prihlaseni': {
+      id: '/prihlaseni'
+      path: '/prihlaseni'
+      fullPath: '/prihlaseni'
+      preLoaderRoute: typeof PrihlaseniRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registrace': {
+      id: '/registrace'
+      path: '/registrace'
+      fullPath: '/registrace'
+      preLoaderRoute: typeof RegistraceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_chraneno/prace': {
+      id: '/_chraneno/prace'
+      path: '/prace'
+      fullPath: '/prace'
+      preLoaderRoute: typeof ChranenoPraceRouteImport
+      parentRoute: typeof ChranenoRouteRoute
+    }
+    '/_chraneno/pripady/$id': {
+      id: '/_chraneno/pripady/$id'
+      path: '/pripady/$id'
+      fullPath: '/pripady/$id'
+      preLoaderRoute: typeof ChranenoPripadyIdRouteImport
+      parentRoute: typeof ChranenoRouteRoute
+    }
+    '/_chraneno/pripady/novy': {
+      id: '/_chraneno/pripady/novy'
+      path: '/pripady/novy'
+      fullPath: '/pripady/novy'
+      preLoaderRoute: typeof ChranenoPripadyNovyRouteImport
+      parentRoute: typeof ChranenoRouteRoute
+    }
   }
 }
 
+interface ChranenoRouteRouteChildren {
+  ChranenoPraceRoute: typeof ChranenoPraceRoute
+  ChranenoPripadyIdRoute: typeof ChranenoPripadyIdRoute
+  ChranenoPripadyNovyRoute: typeof ChranenoPripadyNovyRoute
+}
+
+const ChranenoRouteRouteChildren: ChranenoRouteRouteChildren = {
+  ChranenoPraceRoute: ChranenoPraceRoute,
+  ChranenoPripadyIdRoute: ChranenoPripadyIdRoute,
+  ChranenoPripadyNovyRoute: ChranenoPripadyNovyRoute,
+}
+
+const ChranenoRouteRouteWithChildren = ChranenoRouteRoute._addFileChildren(
+  ChranenoRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChranenoRouteRoute: ChranenoRouteRouteWithChildren,
+  CekaniRoute: CekaniRoute,
+  PrihlaseniRoute: PrihlaseniRoute,
+  RegistraceRoute: RegistraceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
