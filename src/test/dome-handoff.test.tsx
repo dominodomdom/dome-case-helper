@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
@@ -39,7 +40,7 @@ function modelOutput(over: Record<string, unknown> = {}) {
 
 describe("dome-core invarianty v2.0", () => {
   it("ACTIVE_HANDOFF: cíl zachován, gap, support path, hypotéza neověřená", () => {
-    const a = enforceAssessmentInvariants(modelOutput());
+    const a = enforceAssessmentInvariants(modelOutput()) as any;
     expect((a.user_goal as { text: string }).text).toBe("Chci požádat o MOP.");
     expect(a.intervention_level).toBe("ACTIVE_HANDOFF");
     expect((a.immediate_need_gap as { detected: boolean }).detected).toBe(true);
@@ -50,7 +51,7 @@ describe("dome-core invarianty v2.0", () => {
   });
 
   it("halucinovaná organizace/adresa a navigace jsou odstraněny", () => {
-    const sp = enforceAssessmentInvariants(modelOutput()).support_path as Record<string, unknown>;
+    const sp = (enforceAssessmentInvariants(modelOutput()) as any).support_path as any;
     expect(sp.target_name).toBeNull();
     expect(sp.target_address).toBeNull();
     expect(sp.target_source).toBe("none");
