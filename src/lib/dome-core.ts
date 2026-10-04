@@ -4,7 +4,7 @@
  * Doménu dodává jen resolver. Čistý modul bez tajemství — sdílí ho server (prompt, schéma, invarianty) i UI (typy).
  */
 
-import { ACTION_PRIORITIES, ACTION_TYPES, NEED_CATEGORIES, NEED_URGENCIES, REALITY_SOURCES, REALITY_TYPES, TRACK_TYPES, UNKNOWN_IMPACTS } from "./case-state";
+import { ACTION_PRIORITIES, DEADLINE_ANCHORS, EVIDENCE_KINDS, ACTION_TYPES, NEED_CATEGORIES, NEED_URGENCIES, REALITY_SOURCES, REALITY_TYPES, TRACK_TYPES, UNKNOWN_IMPACTS } from "./case-state";
 
 export const INTERVENTION_LEVELS = ["SELF", "OPTIONS", "CONNECT", "ACTIVE_HANDOFF", "SAFETY_HANDOFF"] as const;
 export type InterventionLevel = (typeof INTERVENTION_LEVELS)[number];
