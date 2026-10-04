@@ -183,6 +183,9 @@ export type DomeAssessment = {
   then_actions?: string[];
   say_to_worker?: string;
   handoff_state?: HandoffState;
+  // CASE CORE 1.0
+  case_state?: unknown;
+  change_note?: string;
 };
 
 export type SupportPath = {

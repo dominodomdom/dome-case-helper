@@ -47,6 +47,7 @@ async function loadCaseContext(caseId: string, accessToken: string) {
   const choices: ChoiceId[] = [];
   const userText: string[] = [String(row[c.title] ?? ""), String(row[c.description] ?? "")];
   let previous: HumanHandoff | null = null;
+  let lastAssessment: Record<string, unknown> | null = null;
   if (rows.length === 0) lines.push("(zatím žádné)");
   rows.forEach((r, i) => {
     const kind = r[s.kind];
@@ -61,10 +62,11 @@ async function loadCaseContext(caseId: string, accessToken: string) {
     } else if (kind === "dome_assessment") {
       const a = r[s.assessment] as { current_question?: { text?: string }; intervention_level?: string; handoff_state?: string; human_handoff?: HumanHandoff } | null;
       if (a?.human_handoff) previous = a.human_handoff;
+      if (a) lastAssessment = a as Record<string, unknown>;
       lines.push(`${i + 1}. DOME (úroveň ${a?.intervention_level ?? "?"}, stav ${a?.handoff_state ?? "?"}) SE ZEPTAL: ${a?.current_question?.text ?? ""}`);
     }
   });
-  return { sb, userId, context: lines.join("\n"), documents, choices, userText: userText.join("\n"), previous };
+  return { sb, userId, context: lines.join("\n"), documents, choices, userText: userText.join("\n"), previous, lastAssessment };
 }
 
 /** Vyhodnotí celý případ a uloží nový dome_assessment přes RPC urad_record_dome_assessment. */
@@ -73,9 +75,25 @@ export const assessCase = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result<DomeAssessment>> => {
     try {
       const { generateAssessment, recordAssessment } = await import("./dome.server");
-      const { sb, context, choices, userText, previous } = await loadCaseContext(data.caseId, data.accessToken);
+      const { sb, context, choices, userText, previous, lastAssessment, documents } = await loadCaseContext(data.caseId, data.accessToken);
       // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
       const assessment = await generateAssessment(`${context}\n\nVyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.`, "urad", choices, { caseId: data.caseId, userText, previous });
+      // CASE CORE: canonical stav → validace → uložit jen platný stav.
+      const { buildCaseState, normalizeCaseState, validateCaseState } = await import("./case-state");
+      const { DomeError } = await import("./dome.server");
+      const prevState = normalizeCaseState(lastAssessment, data.caseId);
+      const caseState = buildCaseState({
+        caseId: data.caseId,
+        userGoal: (assessment["user_goal"] as { text?: string } | undefined)?.text ?? null,
+        interpretation: (assessment["hypothesis"] as { text?: string } | undefined)?.text ?? null,
+        draft: assessment["case_draft"] as never,
+        userText, documents,
+        previous: prevState && !prevState.metadata.legacy_normalized ? prevState : prevState ? { ...prevState, actions: [] } : null,
+      });
+      const errs = validateCaseState(caseState);
+      if (errs.length) throw new DomeError(`Vyhodnocení nemá platnou strukturu, nic se neuložilo. (${errs.slice(0, 3).join("; ")})`, 502);
+      delete assessment["case_draft"];
+      assessment["case_state"] = caseState;
       await recordAssessment(sb, data.caseId, assessment);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
@@ -149,6 +167,39 @@ export const analyzeDocument = createServerFn({ method: "POST" })
       });
       if (ins.error) throw new DomeError(`Dokument se nepodařilo zapsat: ${ins.error.message} (kód: ${ins.error.code ?? "?"})`);
       return { ok: true, data: { summary } };
+    } catch (e) {
+      return fail(e);
+    }
+  });
+
+/** Uživatel změnil stav akce → nová verze canonical stavu uložená jako nový (immutable) assessment krok. Bez AI. */
+export const updateActionStatus = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) =>
+    z
+      .object({
+        caseId: z.string().uuid(),
+        accessToken: z.string().min(10),
+        actionId: z.string().min(1).max(80),
+        status: z.enum(["TODO", "IN_PROGRESS", "WAITING", "BLOCKED", "DONE"]),
+        reason: z.string().max(500).nullable(),
+        expectedVersion: z.number().int().min(1),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data }): Promise<Result<{ version: number }>> => {
+    try {
+      const { recordAssessment, DomeError } = await import("./dome.server");
+      const { applyActionStatus, normalizeCaseState, validateCaseState } = await import("./case-state");
+      const { sb, lastAssessment } = await loadCaseContext(data.caseId, data.accessToken);
+      const current = normalizeCaseState(lastAssessment, data.caseId);
+      if (!lastAssessment || !current || current.metadata.legacy_normalized) throw new DomeError("Případ zatím nemá akční plán.", 409);
+      if (current.metadata.version !== data.expectedVersion) throw new DomeError("Stav případu se mezitím změnil. Obnovte stránku.", 409);
+      const next = applyActionStatus(current, data.actionId, data.status, data.reason);
+      const errs = validateCaseState(next);
+      if (errs.length) throw new DomeError(`Změnu nelze uložit: ${errs[0]}`, 422);
+      const act = next.actions.find((a) => a.id === data.actionId)!;
+      await recordAssessment(sb, data.caseId, { ...lastAssessment, case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` });
+      return { ok: true, data: { version: next.metadata.version } };
     } catch (e) {
       return fail(e);
     }

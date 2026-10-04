@@ -8,6 +8,8 @@ import { addUserInput, getAccessToken, listSteps, type CaseStep, type DomeAssess
 import { analyzeDocument, assessCase } from "@/lib/dome.functions";
 import { deriveHandoffState, formatChoice, parseChoice, type ChoiceId } from "@/lib/dome-core";
 import { SupportPathCard } from "./SupportPath";
+import { CaseCorePanel } from "./CaseCore";
+import { normalizeCaseState } from "@/lib/case-state";
 
 const ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -37,6 +39,7 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
   const last = list[list.length - 1];
   const latest = [...list].reverse().find((x) => x.kind === "dome_assessment")?.assessment ?? null;
   const needsAssessment = steps.isSuccess && (!last || last.kind !== "dome_assessment");
+  const caseState = latest ? normalizeCaseState(latest, item.id) : null;
   const level = latest?.intervention_level;
   const urgent = level === "ACTIVE_HANDOFF" || level === "SAFETY_HANDOFF";
   // Stejné odvození jako na serveru — volba uživatele se projeví okamžitě, i u starších hodnocení.
@@ -144,6 +147,7 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
           <SupportPathCard caseId={item.id} a={latest} state={handoffState} disabled={!!busy} onChoice={(id) => void sendText(formatChoice(id))} onArea={(t) => void sendText(t)} />
           {urgent && <GoalPanel a={latest} />}
           <AssessmentView a={latest} />
+          {caseState && <CaseCorePanel caseId={item.id} state={caseState} disabled={!!busy} onChanged={() => qc.invalidateQueries({ queryKey: ["steps", item.id] })} />}
         </>
       )}
 
@@ -276,7 +280,7 @@ function Timeline({ steps }: { steps: CaseStep[] }) {
         {steps.map((st) => {
           const Icon = st.kind === "user_input" ? User : st.kind === "user_document" ? FileText : Sparkles;
           const label = st.kind === "user_input" ? "Vy" : st.kind === "user_document" ? `Dokument: ${st.documentName ?? ""}` : "DOME";
-          const text = st.kind === "dome_assessment" ? st.assessment?.current_question?.text : st.content?.replace(/^\[VOLBA UŽIVATELE[^\]]*\]\s*/, "");
+          const text = st.kind === "dome_assessment" ? (st.assessment?.change_note ?? st.assessment?.current_question?.text) : st.content?.replace(/^\[VOLBA UŽIVATELE[^\]]*\]\s*/, "");
           return (
             <li key={st.id} className="flex gap-4">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground">
