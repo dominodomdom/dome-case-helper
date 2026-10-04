@@ -146,6 +146,11 @@ export async function createCase(input: { title: string; description: string }) 
     })
     .select(CASE_SELECT)
     .single();
-  if (error) throw error;
+  if (error) {
+    // Předáváme skutečnou chybu Supabase včetně kódu, ať jde přesně určit příčina.
+    const e = new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
+    (e as Error & { code?: string }).code = error.code;
+    throw e;
+  }
   return mapCase(data as unknown as Record<string, unknown>);
 }
