@@ -25,6 +25,35 @@ export async function verifyUser(accessToken: string) {
   return { sb, userId: data.user.id };
 }
 
+/**
+ * Uloží důvěryhodný assessment přes service_role — VOLAT AŽ PO ověření uživatele, přístupu a vlastnictví.
+ * Klient vzniká jen zde, jen na serveru, a nikdy se nevrací ani neukládá.
+ */
+export async function recordAssessmentAsServer(caseId: string, userId: string, assessment: Record<string, unknown>) {
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!key) throw new DomeError("Server nemá nastavený klíč pro ukládání hodnocení (SUPABASE_SERVICE_ROLE_KEY).", 500);
+  const admin = createClient(SUPABASE_URL, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (input, init) => {
+        const h = new Headers(init?.headers);
+        if (key.startsWith("sb_") && h.get("Authorization") === `Bearer ${key}`) h.delete("Authorization");
+        h.set("apikey", key);
+        return fetch(input, { ...init, headers: h });
+      },
+    },
+  });
+  const rec = await admin.rpc(SCHEMA.steps.recordAssessmentRpc, {
+    p_case_id: caseId,
+    p_user_id: userId,
+    p_assessment: assessment,
+  });
+  if (rec.error) {
+    console.error("urad_record_dome_assessment", rec.error);
+    throw new DomeError(`Hodnocení se nepodařilo uložit: ${rec.error.message} (kód: ${rec.error.code ?? "?"})`);
+  }
+}
+
 const ASSESSMENT_SCHEMA = {
   type: "object",
   additionalProperties: false,
