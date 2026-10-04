@@ -91,9 +91,10 @@ describe("UI karta pomoci", () => {
     render(<SupportPathCard caseId="c" a={a} state="IMMEDIATE_NEED_DETECTED" disabled={false} onChoice={onChoice} />);
     const btns = screen.getAllByRole("button").map((b) => b.textContent);
     expect(btns[0]).toBe("Chci tam jít");
-    expect(btns).toContain("Teď to nechci");
+    expect(btns).toContain("Potřebuji to vyřešit sám");
+    expect(screen.getByTestId("target-unverified").textContent).toMatch(/Neověřeno/i);
     const text = document.body.textContent ?? "";
-    expect(text).not.toMatch(/hypotéz|paralelní|ve skutečnosti|Vymyšlená/i);
+    expect(text).not.toMatch(/hypotéz|paralelní|ve skutečnosti|Vymyšlená|Podle dostupných informací/i);
     expect(text).toMatch(/neodkládejte kvůli tomu kontakt s pomocí/);
     fireEvent.click(screen.getByText("Chci tam jít"));
     expect(onChoice).toHaveBeenCalledWith("GO");
@@ -107,6 +108,9 @@ describe("UI karta pomoci", () => {
     expect((screen.getByLabelText("Co říct pracovníkovi") as HTMLTextAreaElement).value).toMatch(/MOP/);
     expect(screen.getByText("Kopírovat")).toBeTruthy();
     expect(screen.getByText("Předat shrnutí pracovníkovi")).toBeTruthy();
+    expect(screen.getByText("Dobře. Dostaňme vás teď tam.")).toBeTruthy();
+    expect(screen.getByLabelText("Kde jste")).toBeTruthy();
+    expect(screen.getByTestId("goal-continues").textContent).toMatch(/MOP/);
   });
 
   it("HANDOFF_READY vyžaduje souhlas před předáním telefonu", () => {

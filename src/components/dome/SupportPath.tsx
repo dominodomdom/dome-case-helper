@@ -26,13 +26,14 @@ type Props = {
   state: HandoffState;
   disabled: boolean;
   onChoice: (id: ChoiceId) => void;
+  onArea?: (text: string) => void;
 };
 
 /**
  * Cesta podpory paralelně k cíli uživatele (HUMAN HANDOFF v2.0).
  * Pořadí: kam jít → co udělat teď → jak se tam dostat → co říct → předat telefon. Cíl a dokumenty až pod tím.
  */
-export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props) {
+export function SupportPathCard({ caseId, a, state, disabled, onChoice, onArea }: Props) {
   const level = a.intervention_level ?? a.support_path?.intervention_level;
   const sp = a.support_path;
   const [reopened, setReopened] = useState(false);
@@ -50,6 +51,7 @@ export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props)
   }
 
   const active = level === "ACTIVE_HANDOFF";
+  const verified = !!sp.target_name && !!sp.verified_at && sp.target_source !== "none" && sp.target_source !== "user_reported";
   const flow = state === "USER_EN_ROUTE" || state === "HANDOFF_READY";
   if (state === "HUMAN_CONNECTED" || state === "HANDOFF_COMPLETED") {
     return (
@@ -72,7 +74,7 @@ export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props)
         <div className="flex items-center gap-3">
           <LifeBuoy className="h-5 w-5 text-primary" />
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {active ? "Místo, kde ti mohou pomoci" : "Můžeme přidat člověka, který se tomu věnuje"}
+            {active ? "Místo, kde ti teď mohou pomoci" : "Můžeme přidat člověka, který se tomu věnuje"}
           </p>
         </div>
         {active && sp.immediate_needs.length > 0 && (
@@ -80,13 +82,28 @@ export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props)
         )}
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           {active
-            ? "Tahle služba může pomoct vyřešit dnešní situaci a zároveň s tebou pokračovat v tom, co právě řešíš."
+            ? "Nemusíš dnes vyřešit všechno najednou. Pracovník ti může pomoct s dnešní situací a zároveň s tím, co právě řešíš."
             : "Můžeš to řešit sám, nebo můžeme přidat člověka nebo organizaci, která se tomu věnuje. Je to jen na tobě."}
         </p>
-        <p className="mt-4 font-display text-lg font-semibold">{sp.target_name ?? sp.target_type}</p>
-        {sp.target_address && <p className="text-sm">{sp.target_address} <span className="text-xs text-muted-foreground">(uvedl/a jste vy)</span></p>}
+        {verified ? (
+          <>
+            <p className="mt-4 font-display text-lg font-semibold">{sp.target_name}</p>
+            <p className="text-sm">{sp.target_address}</p>
+            <p className="text-xs text-muted-foreground">Zdroj: {sp.target_source}, ověřeno {sp.verified_at}</p>
+          </>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-border p-3" data-testid="target-unverified">
+            <p className="text-sm font-medium">Kam se obrátit: {sp.target_type}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              <span className="font-semibold uppercase">Neověřeno</span> — konkrétní místo zatím nemám ověřené, proto žádnou organizaci ani adresu nevymýšlím. Pomůžu vám najít nejbližší sociální službu nebo krizovou pomoc.
+            </p>
+          </div>
+        )}
         {sp.services.length > 0 && (
-          <ul className="mt-2 space-y-1 text-sm">{sp.services.map((s, i) => <li key={i}>• {s}</li>)}</ul>
+          <>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{verified ? "Dnes může pomoct s" : "S čím obvykle pomáhají"}</p>
+            <ul className="mt-1 space-y-1 text-sm">{sp.services.map((s, i) => <li key={i}>• {s}</li>)}</ul>
+          </>
         )}
       </div>
 
@@ -96,7 +113,7 @@ export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props)
             <>
               <Button size="lg" disabled={disabled} onClick={() => onChoice("GO")}>Chci tam jít</Button>
               <Button variant="outline" disabled={disabled} onClick={() => onChoice("OTHER")}>Zobrazit jiné možnosti</Button>
-              <Button variant="ghost" disabled={disabled} onClick={() => onChoice("DECLINE")}>Teď to nechci</Button>
+              <Button variant="ghost" disabled={disabled} onClick={() => onChoice("SELF")}>Potřebuji to vyřešit sám</Button>
             </>
           ) : (
             <>
@@ -108,7 +125,7 @@ export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props)
         </div>
       )}
 
-      {flow && <HandoffFlow caseId={caseId} a={a} state={state} disabled={disabled} onChoice={onChoice} />}
+      {flow && <HandoffFlow caseId={caseId} a={a} state={state} disabled={disabled} onChoice={onChoice} onArea={onArea} />}
 
       {/* doklady jen jako podpora, nikdy podmínka */}
       <p className="text-xs leading-relaxed text-muted-foreground">
@@ -118,7 +135,7 @@ export function SupportPathCard({ caseId, a, state, disabled, onChoice }: Props)
   );
 }
 
-function HandoffFlow({ caseId, a, state, disabled, onChoice }: Props) {
+function HandoffFlow({ caseId, a, state, disabled, onChoice, onArea }: Props) {
   const sp = a.support_path!;
   const address = sp.target_address;
   const mapsUrl = address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}&travelmode=transit` : null;
@@ -139,6 +156,9 @@ function HandoffFlow({ caseId, a, state, disabled, onChoice }: Props) {
 
   return (
     <div className="space-y-6" data-testid="handoff-flow">
+      <p className="font-display text-xl font-semibold">Dobře. Dostaňme vás teď tam.</p>
+      {/* 1. KDE JSTE */}
+      {state === "USER_EN_ROUTE" && <WhereAreYou disabled={disabled} onArea={onArea} />}
       {/* 2. CO UDĚLAT TEĎ */}
       {(a.now_actions?.length ?? 0) > 0 && (
         <div>
@@ -185,11 +205,43 @@ function HandoffFlow({ caseId, a, state, disabled, onChoice }: Props) {
 
       {/* 5. PŘEDAT TELEFON / SHRNUTÍ */}
       {state === "USER_EN_ROUTE" ? (
-        <Button variant="outline" disabled={disabled} onClick={() => onChoice("AT_PLACE")}>Jsem na místě</Button>
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-sm font-medium">Jste už na místě?</p>
+          <Button className="mt-2" variant="outline" disabled={disabled} onClick={() => onChoice("AT_PLACE")}>Ano, jsem na místě</Button>
+        </div>
       ) : (
         <PhoneHandover caseId={caseId} disabled={disabled} onChoice={onChoice} />
       )}
       {state === "USER_EN_ROUTE" && <WorkerSummary caseId={caseId} buttonLabel="Předat shrnutí pracovníkovi" />}
+      {/* 5. CO SI VZÍT */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Co si vzít</p>
+        <p className="mt-1 text-sm">Pokud máte občanský průkaz a další dokumenty, vezměte je s sebou. Pokud je nemáte, kontakt s pomocí kvůli tomu neodkládejte.</p>
+      </div>
+      {/* 6. POTOM CÍL */}
+      {a.user_goal?.text && (
+        <p className="text-sm text-muted-foreground" data-testid="goal-continues">Až budete mít vyřešenou dnešní situaci, vrátíme se k vašemu cíli: „{a.user_goal.text}“.</p>
+      )}
+    </div>
+  );
+}
+
+function WhereAreYou({ disabled, onArea }: { disabled: boolean; onArea?: ((text: string) => void) | undefined }) {
+  const [area, setArea] = useState("");
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Kde jste?</p>
+      <p className="mt-1 text-sm text-muted-foreground">Polohu nezjišťuji automaticky. Stačí napsat část města nebo zastávku.</p>
+      <div className="mt-2 flex gap-2">
+        <input
+          value={area}
+          onChange={(e) => setArea(e.target.value)}
+          placeholder="Např. Praha 8, Florenc"
+          aria-label="Kde jste"
+          className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm"
+        />
+        <Button variant="outline" disabled={disabled || !area.trim() || !onArea} onClick={() => { onArea?.(`Jsem teď tady: ${area.trim()}`); setArea(""); }}>Odeslat</Button>
+      </div>
     </div>
   );
 }
@@ -199,8 +251,9 @@ function PhoneHandover({ caseId, disabled, onChoice }: { caseId: string; disable
   if (!consent) {
     return (
       <div className="rounded-xl border border-border p-4" data-testid="handoff-ready">
-        <p className="text-sm leading-relaxed">
-          Pokud chcete, můžete telefon předat pracovníkovi. DOME mu může stručně shrnout situaci, kterou jste zde uvedl/a.
+        <p className="text-sm font-medium">Dobře. Pokud chcete, můžu vám připravit krátké shrnutí pro pracovníka.</p>
+        <p className="mt-1 text-sm leading-relaxed">
+          Můžete také telefon předat pracovníkovi. DOME mu může stručně shrnout situaci, kterou jste zde uvedl/a.
         </p>
         <Button className="mt-3" disabled={disabled} onClick={() => setConsent(true)}>
           <Smartphone className="h-4 w-4" /> Předat telefon pracovníkovi

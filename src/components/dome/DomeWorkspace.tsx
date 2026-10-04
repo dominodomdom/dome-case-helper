@@ -141,7 +141,7 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
       {latest && busy !== "assess" && (
         <>
           {!urgent && <GoalPanel a={latest} />}
-          <SupportPathCard caseId={item.id} a={latest} state={handoffState} disabled={!!busy} onChoice={(id) => void sendText(formatChoice(id))} />
+          <SupportPathCard caseId={item.id} a={latest} state={handoffState} disabled={!!busy} onChoice={(id) => void sendText(formatChoice(id))} onArea={(t) => void sendText(t)} />
           {urgent && <GoalPanel a={latest} />}
           <AssessmentView a={latest} />
         </>
