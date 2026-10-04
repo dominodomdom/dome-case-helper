@@ -1,5 +1,6 @@
 import { getSupabase } from "./supabase";
 import { SCHEMA } from "./supabase-config";
+import type { InterventionLevel, Urgency } from "./dome-core";
 
 export type UradCase = {
   id: string;
@@ -167,6 +168,35 @@ export type DomeAssessment = {
   current_question: { text: string; reason: string };
   next_step: { text: string; condition: string };
   confidence: "low" | "medium";
+  // dome-core/1.0 (starší uložená hodnocení tato pole nemají)
+  user_goal?: { text: string; source: "user_stated" };
+  situation?: string;
+  urgency?: Urgency;
+  intervention_level?: InterventionLevel;
+  primary_next_action?: string;
+  support_path?: SupportPath;
+};
+
+export type SupportPath = {
+  relevance: "none" | "optional" | "recommended" | "urgent";
+  intervention_level: InterventionLevel;
+  reason: string;
+  target_type: string;
+  target_name: string | null;
+  target_address: string | null;
+  target_source: "none" | "user_reported";
+  services: string[];
+  immediate_needs: string[];
+  required_documents: string[];
+  next_action: string;
+  navigation_available: boolean;
+  handoff_available: boolean;
+};
+
+export type HandoffItem = {
+  section: string;
+  label: "FACT" | "USER_REPORTED" | "UNVERIFIED";
+  text: string;
 };
 
 export type CaseStep = {

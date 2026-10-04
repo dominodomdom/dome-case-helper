@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SCHEMA, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config";
+import { buildSystemPrompt, enforceAssessmentInvariants, ASSESSMENT_SCHEMA, HANDOFF_SCHEMA, HANDOFF_SYSTEM, type DomainId } from "./dome-core";
 
 /** Serverový klient jednající JAKO přihlášený uživatel (publishable klíč + jeho token, RLS platí). */
 export function userClient(accessToken: string): SupabaseClient {
@@ -28,7 +29,6 @@ export async function verifyUser(accessToken: string) {
 /**
  * Uloží assessment přes dvouparametrické RPC jako přihlášený uživatel.
  * Funkce v DB (SECURITY DEFINER) sama ověřuje auth.uid(), urad_has_access(), vlastnictví a hypothesis.status.
- * Volat AŽ PO úspěšném vygenerování assessmentu.
  */
 export async function recordAssessment(sb: SupabaseClient, caseId: string, assessment: Record<string, unknown>) {
   const rec = await sb.rpc(SCHEMA.steps.recordAssessmentRpc, {
@@ -40,47 +40,6 @@ export async function recordAssessment(sb: SupabaseClient, caseId: string, asses
     throw new DomeError(`Hodnocení se nepodařilo uložit: ${rec.error.message} (kód: ${rec.error.code ?? "?"})`);
   }
 }
-
-const ASSESSMENT_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: [
-    "hypothesis", "stated_by_user", "verified", "to_verify", "missing_information",
-    "required_documents", "current_question", "next_step", "confidence",
-  ],
-  properties: {
-    hypothesis: {
-      type: "object", additionalProperties: false, required: ["text", "status"],
-      properties: { text: { type: "string" }, status: { type: "string", enum: ["unverified"] } },
-    },
-    stated_by_user: { type: "array", items: { type: "string" } },
-    verified: { type: "array", items: { type: "string" } },
-    to_verify: { type: "array", items: { type: "string" } },
-    missing_information: { type: "array", items: { type: "string" } },
-    required_documents: { type: "array", items: { type: "string" } },
-    current_question: {
-      type: "object", additionalProperties: false, required: ["text", "reason"],
-      properties: { text: { type: "string" }, reason: { type: "string" } },
-    },
-    next_step: {
-      type: "object", additionalProperties: false, required: ["text", "condition"],
-      properties: { text: { type: "string" }, condition: { type: "string" } },
-    },
-    confidence: { type: "string", enum: ["low", "medium"] },
-  },
-} as const;
-
-export const DOME_SYSTEM = `Jsi DOME, administrativní asistent pro agendu Úřadu práce ČR (dávky, příspěvky, příspěvek na bydlení, živobytí, mimořádná okamžitá pomoc, odvolání, doplnění řízení). Pracuješ s jedním konkrétním případem a vyhodnocuješ VŽDY celý dosavadní kontext.
-Pravidla:
-- Hypotéza je vždy NEOVĚŘENÁ pracovní domněnka, nikdy fakt.
-- "stated_by_user": jen to, co uživatel skutečně uvedl (popis, odpovědi).
-- "verified": jen skutečnosti doložené obsahem nahraného dokumentu (uveď zdroj, např. "podle dokumentu X"). Bez dokumentu zůstává prázdné. Nikdy netvrď, že jsi něco ověřil bez dokumentu.
-- "to_verify": tvrzení, která je třeba doložit. "missing_information": co vůbec nevíme.
-- "current_question": PRÁVĚ JEDNA otázka (jedna věta s jedním otazníkem) nebo žádost o JEDEN konkrétní dokument — to nejdůležitější, co je teď potřeba zjistit. "reason": proč právě teď.
-- "next_step": navazující krok podmíněný ("condition") tím, co ještě není ověřeno. Nepředpokládej neověřené skutečnosti.
-- Nikdy neoznačuj případ za vyřešený, nevytvářej právní závěry, nepodávej nic za uživatele.
-- "confidence": "low" nebo "medium", konzervativně.
-Piš česky, stručně, srozumitelně pro laika.`;
 
 type Input = string | Record<string, unknown>[];
 
@@ -146,17 +105,25 @@ export async function callAi(input: Input, jsonSchema?: { name: string; schema: 
   return text;
 }
 
-export async function generateAssessment(context: string) {
+export async function generateAssessment(context: string, domain: DomainId = "urad") {
   const raw = await callAi(
     [
-      { role: "system", content: DOME_SYSTEM },
+      { role: "system", content: buildSystemPrompt(domain) },
       { role: "user", content: context },
     ],
     { name: "dome_assessment", schema: ASSESSMENT_SCHEMA },
   );
-  const a = JSON.parse(raw) as Record<string, unknown>;
-  // Pojistka: hypotéza je vždy neověřená, confidence nikdy nad medium.
-  a["hypothesis"] = { ...(a["hypothesis"] as object), status: "unverified" };
-  if (a["confidence"] !== "medium") a["confidence"] = "low";
-  return a;
+  return enforceAssessmentInvariants(JSON.parse(raw) as Record<string, unknown>);
+}
+
+export async function generateHandoff(context: string) {
+  const raw = await callAi(
+    [
+      { role: "system", content: HANDOFF_SYSTEM },
+      { role: "user", content: context },
+    ],
+    { name: "dome_handoff", schema: HANDOFF_SCHEMA },
+  );
+  const h = JSON.parse(raw) as { items?: { section?: string; label?: string; text?: string }[] } & Record<string, unknown>;
+  return h;
 }
