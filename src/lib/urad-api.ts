@@ -1,6 +1,7 @@
 import { getSupabase } from "./supabase";
 import { SCHEMA } from "./supabase-config";
 import type { HandoffState, InterventionLevel, Urgency } from "./dome-core";
+import type { DomeCaseState } from "./case-state";
 
 export type UradCase = {
   id: string;
@@ -184,7 +185,7 @@ export type DomeAssessment = {
   say_to_worker?: string;
   handoff_state?: HandoffState;
   // CASE CORE 1.0
-  case_state?: unknown;
+  case_state?: DomeCaseState;
   change_note?: string;
 };
 

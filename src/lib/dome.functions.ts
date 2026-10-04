@@ -47,7 +47,7 @@ async function loadCaseContext(caseId: string, accessToken: string) {
   const choices: ChoiceId[] = [];
   const userText: string[] = [String(row[c.title] ?? ""), String(row[c.description] ?? "")];
   let previous: HumanHandoff | null = null;
-  let lastAssessment: Record<string, unknown> | null = null;
+  let lastAssessment = null as Record<string, unknown> | null;
   if (rows.length === 0) lines.push("(zatím žádné)");
   rows.forEach((r, i) => {
     const kind = r[s.kind];
@@ -198,7 +198,7 @@ export const updateActionStatus = createServerFn({ method: "POST" })
       const errs = validateCaseState(next);
       if (errs.length) throw new DomeError(`Změnu nelze uložit: ${errs[0]}`, 422);
       const act = next.actions.find((a) => a.id === data.actionId)!;
-      await recordAssessment(sb, data.caseId, { ...lastAssessment, case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` });
+      await recordAssessment(sb, data.caseId, { ...(lastAssessment as Record<string, unknown>), case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` });
       return { ok: true, data: { version: next.metadata.version } };
     } catch (e) {
       return fail(e);
