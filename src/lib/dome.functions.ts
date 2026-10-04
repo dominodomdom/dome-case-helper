@@ -15,17 +15,18 @@ export const assessCase = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ caseId: z.string().uuid(), accessToken: z.string().min(10) }).parse(d))
   .handler(async ({ data }): Promise<Result<DomeAssessment>> => {
     try {
-      const { verifyUser, generateAssessment, DomeError } = await import("./dome.server");
+      const { verifyUser, generateAssessment, recordAssessmentAsServer, DomeError } = await import("./dome.server");
       const { sb, userId } = await verifyUser(data.accessToken);
       const c = SCHEMA.cases.columns;
       const s = SCHEMA.steps.columns;
       const kase = await sb
         .from(SCHEMA.cases.table)
-        .select(`${c.id},${c.title},${c.description}`)
+        .select(`${c.id},${c.ownerId},${c.title},${c.description}`)
         .eq(c.id, data.caseId)
         .maybeSingle();
       if (kase.error) throw new DomeError(`Případ nelze načíst: ${kase.error.message}`);
       if (!kase.data) throw new DomeError("Případ nebyl nalezen.", 404);
+      if ((kase.data as Record<string, unknown>)[c.ownerId] !== userId) throw new DomeError("Případ vám nepatří.", 403);
       const steps = await sb
         .from(SCHEMA.steps.table)
         .select(`${s.kind},${s.content},${s.documentName},${s.assessment},${s.createdAt}`)
@@ -54,16 +55,11 @@ export const assessCase = createServerFn({ method: "POST" })
       });
       lines.push("", "Vyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.");
 
+      // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
       const assessment = await generateAssessment(lines.join("\n"));
-      const rec = await sb.rpc(SCHEMA.steps.recordAssessmentRpc, {
-        p_case_id: data.caseId,
-        p_user_id: userId,
-        p_assessment: assessment,
-      });
-      if (rec.error) {
-        console.error("urad_record_dome_assessment", rec.error);
-        throw new DomeError(`Hodnocení se nepodařilo uložit: ${rec.error.message} (kód: ${rec.error.code ?? "?"})`);
-      }
+      // Opětovné explicitní ověření vlastnictví těsně před použitím service_role.
+      if ((kase.data as Record<string, unknown>)[c.ownerId] !== userId) throw new DomeError("Případ vám nepatří.", 403);
+      await recordAssessmentAsServer(data.caseId, userId, assessment);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
       return fail(e);
