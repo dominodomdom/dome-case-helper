@@ -23,6 +23,8 @@ export const SCHEMA = {
   },
   cases: {
     table: "urad_cases",
+    /** Skutečný aktivní modul ÚŘAD v public.urad_modules */
+    moduleId: "1bbc571a-8e55-4014-9b26-2ebb14ff378f",
     // Ověřeno proti skutečnému schématu public.urad_cases (16 sloupců).
     columns: {
       id: "id",
