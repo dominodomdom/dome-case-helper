@@ -9,7 +9,8 @@ export const SUPABASE_URL =
 
 // Publishable / anon klíč (veřejný, smí být v kódu). Doplnit z existujícího projektu.
 export const SUPABASE_PUBLISHABLE_KEY =
-  (import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined) ?? "";
+  (import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined) ??
+  "sb_publishable_4GfQks9gfSoVISfQjkJ_LA_SyIX3kQA";
 
 /** Skutečné objekty existujícího schématu modulu ÚŘAD. */
 export const SCHEMA = {
