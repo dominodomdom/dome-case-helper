@@ -114,7 +114,7 @@ export async function listCases(): Promise<UradCase[]> {
     .select(CASE_SELECT)
     .order(c.createdAt, { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(mapCase);
+  return (data ?? []).map((row) => mapCase(row as unknown as Record<string, unknown>));
 }
 
 export async function getCase(id: string): Promise<UradCase | null> {
