@@ -6,6 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { addUserInput, getAccessToken, listSteps, type CaseStep, type DomeAssessment, type UradCase } from "@/lib/urad-api";
 import { analyzeDocument, assessCase } from "@/lib/dome.functions";
+import { CHOICE_PREFIX } from "@/lib/dome-core";
+import { SupportPathCard } from "./SupportPath";
 
 const ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -61,20 +63,24 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needsAssessment, last?.id, busy]);
 
-  async function send() {
-    const text = answer.trim();
-    if (!text) return;
+  async function sendText(text: string) {
+    if (!text) return false;
     setBusy("send");
     setError(null);
     try {
       await addUserInput(item.id, text);
-      setAnswer("");
       await qc.invalidateQueries({ queryKey: ["steps", item.id] });
+      return true;
     } catch (e) {
       setError(`Odpověď se nepodařilo uložit: ${e instanceof Error ? e.message : ""}`);
+      return false;
     } finally {
       setBusy(null);
     }
+  }
+
+  async function send() {
+    if (await sendText(answer.trim())) setAnswer("");
   }
 
   async function onFile(file: File | undefined) {
@@ -118,6 +124,18 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-6 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> DOME vyhodnocuje celý případ…
         </div>
+      )}
+
+      {latest && busy !== "assess" && latest.user_goal?.text && (
+        <div className="rounded-2xl border border-border p-5">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Váš cíl</p>
+          <p className="mt-1 font-medium">{latest.user_goal.text}</p>
+          {latest.primary_next_action && <p className="mt-2 text-sm text-muted-foreground">Další krok k cíli: {latest.primary_next_action}</p>}
+        </div>
+      )}
+
+      {latest && busy !== "assess" && (
+        <SupportPathCard caseId={item.id} a={latest} disabled={!!busy} onChoice={(t) => void sendText(`${CHOICE_PREFIX} ${t}`)} />
       )}
 
       {latest && busy !== "assess" && <AssessmentView a={latest} />}
