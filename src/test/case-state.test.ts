@@ -85,11 +85,61 @@ describe("CASE CORE", () => {
   it("nocleh se neduplikuje; lhůta z dokumentu vytvoří deadline hook", () => {
     const s = build();
     expect(s.needs.filter((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")).toHaveLength(1);
-    const d = buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: TEXT, documents: 1, previous: null,
-      draft: { ...draft, reality: [{ key: "lhuta", type: "FACT", text: "Odvolání lze podat do 15 dnů od doručení.", source: "DOCUMENT", need_keys: [] }] } });
+    const d = buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: TEXT, documents: 1, documentNames: ["rozhodnuti.pdf"], previous: null,
+      draft: { ...draft, reality: [{ key: "lhuta", type: "FACT", text: "Odvolání lze podat do 15 dnů od doručení.", source: "DOCUMENT", document_name: "rozhodnuti.pdf", need_keys: [] }] } });
+    expect(d.reality[0]!.evidence_ids).toEqual(["doc:rozhodnuti.pdf"]);
     expect(d.reality[0]!.type).toBe("FACT");
     expect(d.links.deadlines).toHaveLength(1);
     expect(d.links.deadlines[0]!.date).toBeNull();
+  });
+  it("HARDENING: FACT bez existujícího dokumentu / s cizím názvem / ze zdroje USER nikdy není FACT", () => {
+    const mk = (r: any, names: string[] = []) => buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: TEXT, documents: names.length, documentNames: names, previous: null, draft: { ...draft, reality: [r] } }).reality[0]!;
+    expect(mk({ key: "a", type: "FACT", text: "x", source: "DOCUMENT", document_name: "neexistuje.pdf", need_keys: [] }, ["jiny.pdf"]).type).not.toBe("FACT");
+    expect(mk({ key: "a", type: "FACT", text: "x", source: "USER", document_name: null, need_keys: [] }).type).toBe("CLAIM");
+    expect(mk({ key: "a", type: "FACT", text: "x", source: "OFFICIAL_SOURCE", document_name: null, need_keys: [] }).type).not.toBe("FACT");
+    const v = mk({ key: "a", type: "CLAIM", text: "x", source: "USER", document_name: null, need_keys: [] });
+    expect(v.certainty).not.toBe("VERIFIED");
+  });
+  it("HARDENING: validace odmítne FACT bez evidence, VERIFIED u CLAIM, WAITING bez důvodu", () => {
+    const s = build();
+    expect(validateCaseState({ ...s, reality: [{ ...s.reality[0]!, type: "FACT", source: "DOCUMENT", certainty: "VERIFIED" }] }).join()).toMatch(/FACT bez evidence/);
+    expect(validateCaseState({ ...s, reality: [{ ...s.reality[0]!, certainty: "VERIFIED" }] }).join()).toMatch(/VERIFIED jen u FACT/);
+    expect(validateCaseState({ ...s, actions: s.actions.map((a, i) => (i === 0 ? { ...a, status: "WAITING" as const, status_reason: null } : a)) }).join()).toMatch(/chybí důvod/);
+  });
+  it("HARDENING: částka a lhůta jen pokud zazněly (AMOUNT_UNKNOWN / DEADLINE_UNKNOWN)", () => {
+    const n = (amount: any, deadline: any, text = TEXT) => buildCaseState({ caseId: ID, userGoal: null, interpretation: null, userText: text, documents: 0, previous: null,
+      draft: { ...draft, needs: [{ key: "k", category: "FOOD", description: "jídlo", amount, urgency: "HIGH", deadline, tracks: [] }], actions: [] } }).needs.find((x) => x.id === "need_k")!;
+    expect(n(1500, null).amount).toBeNull(); // vymyšlená částka
+    expect(n(5000, null, "Potřebuji 5 000 Kč na nájem").amount).toBe(5000);
+    expect(n(null, "15. 11. 2026").deadline).toBeNull(); // vymyšlená lhůta
+    expect(n(null, "do 15 dnů", "odvolání do 15 dnů").deadline).toBe("do 15 dnů");
+    expect(n(-3, null).amount).toBeNull();
+  });
+  it("HARDENING: blokovanou akci nelze dokončit ani začít; tracky jsou deterministické", () => {
+    const s = build();
+    expect(() => applyActionStatus(s, "act_podani", "DONE", null)).toThrow(/závisí/);
+    expect(() => applyActionStatus(s, "act_podani", "IN_PROGRESS", null)).toThrow(/závisí/);
+    expect(applyActionStatus(s, "act_podani", "BLOCKED", "čekám na doklady").actions.find((a) => a.id === "act_podani")!.status).toBe("BLOCKED");
+    const t1 = build(null).tracks.map((t) => t.id);
+    expect(build(null).tracks.map((t) => t.id)).toEqual(t1);
+    expect(t1).toEqual(["track_survival", "track_administrative", "track_housing", "track_income", "track_support"]);
+  });
+  it("HARDENING: AI nepřepíše žádný uživatelský stav (TODO→každý stav)", () => {
+    const s = build();
+    for (const [st, why] of [["IN_PROGRESS", null], ["WAITING", "x"], ["BLOCKED", "y"], ["DONE", null]] as const) {
+      const changed = applyActionStatus(s, "act_najit_nocleh", st, why);
+      expect(build(changed).actions.find((a) => a.id === "act_najit_nocleh")!.status).toBe(st);
+      // i když model akci vynechá
+      expect(build(changed, { ...draft, actions: [] }).actions.find((a) => a.id === "act_najit_nocleh")!.status).toBe(st);
+    }
+  });
+  it("HARDENING: normalizace legacy je deterministická a nevytváří FACT", () => {
+    const legacy = { stated_by_user: ["a"], verified: ["b"], to_verify: ["c"], missing_information: ["d"], hypothesis: { text: "h", status: "unverified" } };
+    const a1 = normalizeCaseState(legacy, ID), a2 = normalizeCaseState(legacy, ID);
+    expect(a1).toEqual(a2);
+    expect(a1!.reality.some((r) => r.type === "FACT" || r.certainty === "VERIFIED")).toBe(false);
+    expect(normalizeCaseState({ hypothesis: { text: "v1" } }, ID)!.reality).toEqual([]); // dome-core 1.0 bez polí
+    expect(normalizeCaseState({ case_state: { dome_case_schema_version: "0.9" }, user_goal: { text: "g" } }, ID)!.metadata.legacy_normalized).toBe(true);
   });
   it("starší assessment se normalizuje bez pádu", () => {
     expect(normalizeCaseState(null, ID)).toBeNull();

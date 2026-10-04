@@ -151,7 +151,7 @@ export const emptyPerson = (): PersonMap => ({
 
 /* ---------- Vstup od modelu (draft s klíči místo ID) ---------- */
 export type CaseDraft = {
-  reality: { key: string; type: string; text: string; source: string; need_keys: string[] }[];
+  reality: { key: string; type: string; text: string; source: string; document_name?: string | null; need_keys: string[] }[];
   person: PersonMap;
   needs: { key: string; category: string; description: string; amount: number | null; urgency: string; deadline: string | null; tracks: string[] }[];
   actions: { key: string; title: string; description: string; type: string; priority: string; track: string | null; need_keys: string[]; depends_on: string[] }[];
@@ -173,9 +173,29 @@ export function buildCaseState(input: {
   draft: Partial<CaseDraft> | null | undefined;
   userText: string;
   documents: number;
+  /** Názvy skutečně nahraných dokumentů (FACT musí odkazovat na jeden z nich). */
+  documentNames?: string[];
+  /** Text, ze kterého smí pocházet částky a lhůty (výroky uživatele + obsah dokumentů). */
+  evidenceText?: string;
   previous: DomeCaseState | null;
   now?: Date;
 }): DomeCaseState {
+  const evidence = (input.evidenceText ?? input.userText).toLowerCase();
+  const digits = (x: string) => x.replace(/\D/g, "");
+  const evidenceDigits = evidence.replace(/(\d)[\s.\u00a0](?=\d{3}\b)/g, "$1"); // 5 000 / 5.000 → 5000
+  /** Částka jen pokud číslo skutečně zaznělo — jinak AMOUNT_UNKNOWN (null). */
+  const groundedAmount = (v: unknown): number | null => {
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return null;
+    return new RegExp(`(^|\\D)${Math.round(v)}(\\D|$)`).test(evidenceDigits) ? v : null;
+  };
+  /** Lhůta jen pokud její text / čísla zazněly — jinak DEADLINE_UNKNOWN (null). */
+  const groundedDeadline = (v: unknown): string | null => {
+    if (typeof v !== "string" || !v.trim()) return null;
+    const dg = digits(v);
+    if (dg) return dg.split("").length > 0 && v.match(/\d+/g)!.every((n) => evidence.includes(n)) ? v.trim() : null;
+    return evidence.includes(v.trim().toLowerCase()) ? v.trim() : null;
+  };
+  const docNames = (input.documentNames ?? []).map((n) => n.toLowerCase());
   const now = (input.now ?? new Date()).toISOString();
   const d = input.draft ?? {};
   const prev = input.previous;
@@ -189,10 +209,10 @@ export function buildCaseState(input: {
       id,
       category: pick(n.category, NEED_CATEGORIES, "OTHER"),
       description: String(n.description ?? ""),
-      amount: typeof n.amount === "number" && n.amount > 0 ? n.amount : null,
+      amount: groundedAmount(n.amount),
       currency: "CZK",
       urgency: pick(n.urgency, NEED_URGENCIES, "UNKNOWN"),
-      deadline: typeof n.deadline === "string" && n.deadline.trim() ? n.deadline : null,
+      deadline: groundedDeadline(n.deadline),
       evidence_ids: [],
       status: old?.status ?? "OPEN",
       track_ids: (n.tracks ?? []).filter((t) => TRACK_TYPES.includes(t as TrackType)).map((t) => `track_${t.toLowerCase()}`),
@@ -231,13 +251,17 @@ export function buildCaseState(input: {
 
   const reality: RealityItem[] = (d.reality ?? []).map((r) => {
     let type = pick(r.type, REALITY_TYPES, "CLAIM");
-    const source = pick(r.source, REALITY_SOURCES, "USER");
-    // CLAIM ≠ FACT: FACT jen z dokumentu / oficiálního zdroje a jen když dokument existuje.
-    if (type === "FACT" && !((source === "DOCUMENT" && input.documents > 0) || source === "OFFICIAL_SOURCE")) type = "CLAIM";
-    const certainty: Certainty = type === "FACT" ? "VERIFIED" : type === "CLAIM" ? "POSSIBLE" : type === "VERIFICATION" ? "UNKNOWN" : "POSSIBLE";
+    let source = pick(r.source, REALITY_SOURCES, "USER");
+    // CLAIM ≠ FACT: FACT jen s evidencí = odkaz na skutečně nahraný dokument. Jinak CLAIM (od uživatele) / VERIFICATION.
+    const docRef = typeof r.document_name === "string" ? r.document_name.toLowerCase().trim() : "";
+    const doc = docRef && docNames.includes(docRef) ? docRef : null;
+    if (source === "DOCUMENT" && !doc) source = "OTHER";
+    if (type === "FACT" && !doc) type = source === "USER" ? "CLAIM" : "VERIFICATION";
+    if (source === "OFFICIAL_SOURCE") source = "OTHER"; // žádný oficiální zdroj zatím není napojen
+    const certainty: Certainty = type === "FACT" ? "VERIFIED" : type === "VERIFICATION" ? "UNKNOWN" : "POSSIBLE";
     const id = `real_${slug(r.key || r.text)}`;
     return {
-      id, type, text: String(r.text ?? ""), certainty, source, evidence_ids: [],
+      id, type, text: String(r.text ?? ""), certainty, source, evidence_ids: type === "FACT" && doc ? [`doc:${doc}`] : [],
       related_need_ids: (r.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)), related_route_ids: [],
       created_at: prevCreated(id, prev?.reality),
     };
@@ -315,6 +339,8 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if (!REALITY_TYPES.includes(r.type)) e.push(`reality ${r.id}: type`);
     if (!CERTAINTIES.includes(r.certainty)) e.push(`reality ${r.id}: certainty`);
     if (r.type === "FACT" && r.source === "USER") e.push(`reality ${r.id}: tvrzení uživatele nesmí být FACT`);
+    if (r.type === "FACT" && (r.evidence_ids.length === 0 || r.certainty !== "VERIFIED")) e.push(`reality ${r.id}: FACT bez evidence`);
+    if (r.type !== "FACT" && r.certainty === "VERIFIED") e.push(`reality ${r.id}: VERIFIED jen u FACT`);
     r.related_need_ids.forEach((x) => needIds.has(x) || e.push(`reality ${r.id}: neznámá potřeba ${x}`));
   });
   s.needs.forEach((n) => {
@@ -322,6 +348,7 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if (!NEED_CATEGORIES.includes(n.category)) e.push(`need ${n.id}: category`);
     if (!NEED_URGENCIES.includes(n.urgency)) e.push(`need ${n.id}: urgency`);
     if (!NEED_STATUSES.includes(n.status)) e.push(`need ${n.id}: status`);
+    if (n.amount !== null && !(typeof n.amount === "number" && n.amount > 0)) e.push(`need ${n.id}: amount`);
     n.track_ids.forEach((x) => trackIds.has(x) || e.push(`need ${n.id}: neznámý track ${x}`));
   });
   s.tracks.forEach((t) => { uniq(t.id); if (!TRACK_TYPES.includes(t.type)) e.push(`track ${t.id}: type`); });
@@ -331,6 +358,8 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if (!ACTION_STATUSES.includes(a.status)) e.push(`action ${a.id}: status`);
     if (!ACTION_TYPES.includes(a.type)) e.push(`action ${a.id}: type`);
     if (a.track_id && !trackIds.has(a.track_id)) e.push(`action ${a.id}: neznámý track`);
+    if ((a.status === "WAITING" || a.status === "BLOCKED") && !a.status_reason?.trim()) e.push(`action ${a.id}: chybí důvod`);
+    if (a.status === "DONE" && !a.completed_at) e.push(`action ${a.id}: DONE bez času`);
     a.need_ids.forEach((x) => needIds.has(x) || e.push(`action ${a.id}: neznámá potřeba ${x}`));
     a.depends_on_action_ids.forEach((x) => actionIds.has(x) || e.push(`action ${a.id}: neznámá závislost ${x}`));
   });
@@ -364,6 +393,7 @@ export function applyActionStatus(s: DomeCaseState, actionId: string, status: Ac
   if (!a) throw new Error("Akce v aktuálním stavu případu neexistuje.");
   if (!ACTION_STATUSES.includes(status)) throw new Error("Neplatný stav akce.");
   if ((status === "WAITING" || status === "BLOCKED") && !reason?.trim()) throw new Error("U stavu Čeká / Blokováno uveďte důvod.");
+  if ((status === "DONE" || status === "IN_PROGRESS") && isActionBlocked(a, s.actions)) throw new Error("Tuto akci nejde začít, dokud nejsou hotové akce, na kterých závisí.");
   const iso = now.toISOString();
   return {
     ...s,
@@ -390,7 +420,8 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
     const t = new Date(0).toISOString();
     const reality: RealityItem[] = [
       ...arr("stated_by_user").map((x, i) => ({ id: `real_legacy_c${i}`, type: "CLAIM" as const, text: x, certainty: "POSSIBLE" as const, source: "USER" as const })),
-      ...arr("verified").map((x, i) => ({ id: `real_legacy_f${i}`, type: "FACT" as const, text: x, certainty: "VERIFIED" as const, source: "DOCUMENT" as const })),
+      // Starší "verified" nemá dohledatelnou evidenci → nikdy FACT; jen k (opětovnému) ověření.
+      ...arr("verified").map((x, i) => ({ id: `real_legacy_f${i}`, type: "VERIFICATION" as const, text: x, certainty: "LIKELY" as const, source: "OTHER" as const })),
       ...arr("to_verify").map((x, i) => ({ id: `real_legacy_v${i}`, type: "VERIFICATION" as const, text: x, certainty: "UNKNOWN" as const, source: "SYSTEM" as const })),
     ].map((r) => ({ ...r, evidence_ids: [], related_need_ids: [], related_route_ids: [], created_at: t }));
     const goal = (a["user_goal"] as { text?: string } | undefined)?.text ?? null;

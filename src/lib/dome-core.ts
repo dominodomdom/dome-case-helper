@@ -125,7 +125,7 @@ JAZYK A MOST, NE CHECKLIST:
 - Krizový příklad: "MOP můžeme připravit. Protože ale rozhodnutí o MOP nemusí vyřešit dnešní noc, je teď nejpraktičtější dostat vás k pracovníkovi, který může řešit dnešní jídlo a nocleh a zároveň vám pomoct pokračovat v žádosti."
 
 CASE CORE ("case_draft") — strukturovaný stav případu:
-- reality: každá informace zvlášť. CLAIM = co uvedl uživatel (i "Mám 0 Kč" je CLAIM, dokud není doloženo). FACT jen z obsahu nahraného dokumentu (source DOCUMENT). INTERPRETATION = tvůj výklad (nikdy právní závěr). VERIFICATION = co je potřeba ověřit.
+- reality: každá informace zvlášť. CLAIM = co uvedl uživatel (i "Mám 0 Kč" je CLAIM, dokud není doloženo). FACT jen z obsahu nahraného dokumentu (source DOCUMENT, document_name = přesný název dokumentu z chronologie). Jinak document_name null. INTERPRETATION = tvůj výklad (nikdy právní závěr). VERIFICATION = co je potřeba ověřit.
 - person: jen informace relevantní pro případ, které zazněly; jinak null / [].
 - needs: skutečné potřeby, ne požadavek. "Potřebuji 5 000 Kč" není potřeba — rozlož na důvody (nocleh, strava, doprava…). amount jen pokud uživatel částku výslovně uvedl, jinak null. deadline jen pokud zazněl/je v dokumentu, jinak null. urgency UNKNOWN, když nevíš. tracks: SURVIVAL (24–72 h), ADMINISTRATIVE, HOUSING, INCOME, SUPPORT.
 - actions: konkrétní kroky s prioritou NOW / TODAY / FIRST_WORKING_DAY / THIS_WEEK / LATER. Nezaměňuj urgentní problém za urgentní úřední úkon (nocleh NOW, žádost o dávku FIRST_WORKING_DAY). Typy: OBTAIN_EVIDENCE, PREPARE_APPLICATION, SUBMIT_APPLICATION, VERIFY_LEGAL_BASIS, FOLLOW_UP_DEADLINE, CONTACT_SUPPORT, SECURE_BASIC_NEED, GENERAL. depends_on = klíče akcí, které musí být hotové dřív. Každá zásadní akce má need_keys. Při krizi vytvoř okamžitý plán napříč relevantními tracky, ne jen "podejte dávku".
@@ -151,8 +151,8 @@ const nullableStrS = { type: ["string", "null"] } as const;
 const CASE_DRAFT_SCHEMA = {
   type: "object", additionalProperties: false, required: ["reality", "person", "needs", "actions", "unknowns"],
   properties: {
-    reality: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "type", "text", "source", "need_keys"], properties: {
-      key: str, type: enumOf(REALITY_TYPES), text: str, source: enumOf(REALITY_SOURCES), need_keys: { type: "array", items: str } } } },
+    reality: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "type", "text", "source", "document_name", "need_keys"], properties: {
+      key: str, type: enumOf(REALITY_TYPES), text: str, source: enumOf(REALITY_SOURCES), document_name: nullableStrS, need_keys: { type: "array", items: str } } } },
     person: { type: "object", additionalProperties: false, required: ["current_status", "employment_status", "education_status", "housing_status", "income_status", "available_resources", "relevant_social_context", "relevant_procedures", "relevant_documents"], properties: {
       current_status: nullableStrS, employment_status: nullableStrS, education_status: nullableStrS, housing_status: nullableStrS, income_status: nullableStrS,
       available_resources: { type: "array", items: str }, relevant_social_context: { type: "array", items: str }, relevant_procedures: { type: "array", items: str }, relevant_documents: { type: "array", items: str } } },
