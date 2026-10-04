@@ -1,6 +1,6 @@
 import { getSupabase } from "./supabase";
 import { SCHEMA } from "./supabase-config";
-import type { InterventionLevel, Urgency } from "./dome-core";
+import type { HandoffState, InterventionLevel, Urgency } from "./dome-core";
 
 export type UradCase = {
   id: string;
