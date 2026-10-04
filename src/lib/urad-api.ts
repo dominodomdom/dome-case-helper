@@ -27,17 +27,60 @@ export async function getCurrentUser() {
   return data.user;
 }
 
-/** Stav schválení čte z existující tabulky (TODO: ověřit tvar sloupce). */
-export async function isApproved(userId: string): Promise<boolean> {
-  const a = SCHEMA.approval;
-  const { data, error } = await getSupabase()
-    .from(a.table)
-    .select(a.statusColumn)
-    .eq(a.userIdColumn, userId)
-    .maybeSingle();
-  if (error || !data) return false;
-  const v = (data as Record<string, unknown>)[a.statusColumn];
-  return v === true || v === "approved" || v === "schvaleno";
+export type AccessStatus = "pending" | "approved" | "rejected" | "suspended" | "unknown";
+
+export type MyAccess = {
+  status: AccessStatus;
+  role: string | null;
+  hasAccess: boolean;
+  isAdmin: boolean;
+  rejectionReason: string | null;
+  suspensionReason: string | null;
+};
+
+function normalizeAccess(raw: unknown): MyAccess | null {
+  const row = (Array.isArray(raw) ? raw[0] : raw) as Record<string, unknown> | null | undefined;
+  if (!row || typeof row !== "object") return null;
+  const s = String(row["status"] ?? "unknown");
+  const status: AccessStatus = ["pending", "approved", "rejected", "suspended"].includes(s)
+    ? (s as AccessStatus)
+    : "unknown";
+  // Přístup povolí jen backend: has_access / is_approved z DB, nikdy lokální odhad.
+  const hasAccess =
+    row["has_access"] === true || (row["has_access"] === undefined && row["is_approved"] === true);
+  return {
+    status,
+    role: (row["role"] as string | null) ?? null,
+    hasAccess,
+    isAdmin: row["is_admin"] === true,
+    rejectionReason: (row["rejection_reason"] as string | null) ?? null,
+    suspensionReason: (row["suspension_reason"] as string | null) ?? null,
+  };
+}
+
+/**
+ * Skutečný přístupový stav z existujícího backendu.
+ * 1) RPC urad_my_access(); 2) záloha: vlastní řádek urad_user_access (RLS).
+ */
+export async function getMyAccess(): Promise<MyAccess | null> {
+  const sb = getSupabase();
+  const a = SCHEMA.access;
+  const rpc = await sb.rpc(a.myAccessRpc);
+  if (!rpc.error) {
+    const n = normalizeAccess(rpc.data);
+    if (n) return n;
+  }
+  const user = await getCurrentUser();
+  if (!user) return null;
+  const { data, error } = await sb.from(a.table).select("*").eq(a.userIdColumn, user.id).maybeSingle();
+  if (error || !data) return null;
+  const n = normalizeAccess(data);
+  // Řádek tabulky nemá has_access; ověřit u backendu přes urad_has_access().
+  if (n) {
+    const has = await sb.rpc("urad_has_access");
+    n.hasAccess = !has.error && has.data === true;
+  }
+  return n;
 }
 
 export async function listCases(): Promise<UradCase[]> {
