@@ -4,6 +4,8 @@
  * Doménu dodává jen resolver. Čistý modul bez tajemství — sdílí ho server (prompt, schéma, invarianty) i UI (typy).
  */
 
+import { ACTION_PRIORITIES, ACTION_TYPES, NEED_CATEGORIES, NEED_URGENCIES, REALITY_SOURCES, REALITY_TYPES, TRACK_TYPES, UNKNOWN_IMPACTS } from "./case-state";
+
 export const INTERVENTION_LEVELS = ["SELF", "OPTIONS", "CONNECT", "ACTIVE_HANDOFF", "SAFETY_HANDOFF"] as const;
 export type InterventionLevel = (typeof INTERVENTION_LEVELS)[number];
 export const URGENCY_LEVELS = ["low", "medium", "high", "critical"] as const;
@@ -122,6 +124,15 @@ JAZYK A MOST, NE CHECKLIST:
 - MOP: "O přiznání MOP rozhoduje ÚP." Nikdy netvrď, že MOP bude přiznána ani že z ní bude zaplacen nocleh. DOME může připravit text žádosti, podklady, vysvětlit postup a shrnutí.
 - Krizový příklad: "MOP můžeme připravit. Protože ale rozhodnutí o MOP nemusí vyřešit dnešní noc, je teď nejpraktičtější dostat vás k pracovníkovi, který může řešit dnešní jídlo a nocleh a zároveň vám pomoct pokračovat v žádosti."
 
+CASE CORE ("case_draft") — strukturovaný stav případu:
+- reality: každá informace zvlášť. CLAIM = co uvedl uživatel (i "Mám 0 Kč" je CLAIM, dokud není doloženo). FACT jen z obsahu nahraného dokumentu (source DOCUMENT). INTERPRETATION = tvůj výklad (nikdy právní závěr). VERIFICATION = co je potřeba ověřit.
+- person: jen informace relevantní pro případ, které zazněly; jinak null / [].
+- needs: skutečné potřeby, ne požadavek. "Potřebuji 5 000 Kč" není potřeba — rozlož na důvody (nocleh, strava, doprava…). amount jen pokud uživatel částku výslovně uvedl, jinak null. deadline jen pokud zazněl/je v dokumentu, jinak null. urgency UNKNOWN, když nevíš. tracks: SURVIVAL (24–72 h), ADMINISTRATIVE, HOUSING, INCOME, SUPPORT.
+- actions: konkrétní kroky s prioritou NOW / TODAY / FIRST_WORKING_DAY / THIS_WEEK / LATER. Nezaměňuj urgentní problém za urgentní úřední úkon (nocleh NOW, žádost o dávku FIRST_WORKING_DAY). Typy: OBTAIN_EVIDENCE, PREPARE_APPLICATION, SUBMIT_APPLICATION, VERIFY_LEGAL_BASIS, FOLLOW_UP_DEADLINE, CONTACT_SUPPORT, SECURE_BASIC_NEED, GENERAL. depends_on = klíče akcí, které musí být hotové dřív. Každá zásadní akce má need_keys. Při krizi vytvoř okamžitý plán napříč relevantními tracky, ne jen "podejte dávku".
+- unknowns: jen otázky, jejichž odpověď může změnit postup; why_it_matters je povinné.
+- klíče (key) drž stabilní mezi vyhodnoceními (krátké, popisné, česky bez diakritiky).
+- Nikdy "máte nárok". Piš: "Tato možnost se jeví jako relevantní, ale je potřeba ověřit X." MOP je jen možný mechanismus, ne cíl uživatele.
+
 VÝSTUP:
 - "current_question" = PRÁVĚ JEDNA otázka — nejdůležitější teď (při ACTIVE_HANDOFF obvykle kde se nachází nebo zda může jít na místo; při SAFETY na bezpečí).
 - "primary_next_action" = jeden praktický krok teď.
@@ -135,6 +146,24 @@ export function buildSystemPrompt(domain: DomainId): string {
 }
 
 const str = { type: "string" } as const;
+const enumOf = (v: readonly string[]) => ({ type: "string", enum: [...v] }) as const;
+const nullableStrS = { type: ["string", "null"] } as const;
+const CASE_DRAFT_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["reality", "person", "needs", "actions", "unknowns"],
+  properties: {
+    reality: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "type", "text", "source", "need_keys"], properties: {
+      key: str, type: enumOf(REALITY_TYPES), text: str, source: enumOf(REALITY_SOURCES), need_keys: { type: "array", items: str } } } },
+    person: { type: "object", additionalProperties: false, required: ["current_status", "employment_status", "education_status", "housing_status", "income_status", "available_resources", "relevant_social_context", "relevant_procedures", "relevant_documents"], properties: {
+      current_status: nullableStrS, employment_status: nullableStrS, education_status: nullableStrS, housing_status: nullableStrS, income_status: nullableStrS,
+      available_resources: { type: "array", items: str }, relevant_social_context: { type: "array", items: str }, relevant_procedures: { type: "array", items: str }, relevant_documents: { type: "array", items: str } } },
+    needs: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "category", "description", "amount", "urgency", "deadline", "tracks"], properties: {
+      key: str, category: enumOf(NEED_CATEGORIES), description: str, amount: { type: ["number", "null"] }, urgency: enumOf(NEED_URGENCIES), deadline: nullableStrS, tracks: { type: "array", items: enumOf(TRACK_TYPES) } } } },
+    actions: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "title", "description", "type", "priority", "track", "need_keys", "depends_on"], properties: {
+      key: str, title: str, description: str, type: enumOf(ACTION_TYPES), priority: enumOf(ACTION_PRIORITIES), track: { type: ["string", "null"], enum: [...TRACK_TYPES, null] }, need_keys: { type: "array", items: str }, depends_on: { type: "array", items: str } } } },
+    unknowns: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "question", "why_it_matters", "need_keys", "impact"], properties: {
+      key: str, question: str, why_it_matters: str, need_keys: { type: "array", items: str }, impact: enumOf(UNKNOWN_IMPACTS) } } },
+  },
+} as const;
 const strArr = { type: "array", items: str } as const;
 const nullableStr = { type: ["string", "null"] } as const;
 
@@ -145,7 +174,7 @@ export const ASSESSMENT_SCHEMA = {
     "user_goal", "user_message", "situation", "urgency", "intervention_level", "immediate_need_gap",
     "now_actions", "then_actions", "hypothesis", "stated_by_user", "verified", "to_verify",
     "missing_information", "required_documents", "current_question", "next_step", "primary_next_action",
-    "say_to_worker", "support_path", "handoff_state_suggestion", "confidence",
+    "say_to_worker", "support_path", "handoff_state_suggestion", "confidence", "case_draft",
   ],
   properties: {
     user_goal: {
@@ -205,6 +234,7 @@ export const ASSESSMENT_SCHEMA = {
       },
     },
     handoff_state_suggestion: { type: "string", enum: [...HANDOFF_STATES] },
+    case_draft: CASE_DRAFT_SCHEMA,
     confidence: { type: "string", enum: ["low", "medium"] },
   },
 } as const;
