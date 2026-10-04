@@ -28,7 +28,12 @@ function Dashboard() {
       <section className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Vaše případy</h2>
         {q.isPending && <p className="text-muted-foreground">Načítám…</p>}
-        {q.isError && <p className="text-destructive">Případy se nepodařilo načíst.</p>}
+        {q.isError && (
+          <p className="text-destructive">
+            Případy se nepodařilo načíst.
+            {q.error instanceof Error && <span className="block text-xs opacity-80">{q.error.message}</span>}
+          </p>
+        )}
         {q.data?.length === 0 && (
           <p className="rounded-2xl border border-dashed border-border p-6 text-center text-muted-foreground">
             Zatím nemáte žádný případ.

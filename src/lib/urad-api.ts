@@ -3,20 +3,38 @@ import { SCHEMA } from "./supabase-config";
 
 export type UradCase = {
   id: string;
+  caseNumber: string | null;
   title: string;
   description: string | null;
   status: string | null;
+  priority: string | null;
+  openedAt: string | null;
   createdAt: string | null;
 };
 
 const c = SCHEMA.cases.columns;
 
+/** Explicitní projekce skutečných sloupců public.urad_cases. */
+const CASE_SELECT = [
+  c.id,
+  c.caseNumber,
+  c.title,
+  c.description,
+  c.status,
+  c.priority,
+  c.openedAt,
+  c.createdAt,
+].join(",");
+
 function mapCase(row: Record<string, unknown>): UradCase {
   return {
     id: String(row[c.id]),
+    caseNumber: (row[c.caseNumber] as string | null) ?? null,
     title: (row[c.title] as string) ?? "Bez názvu",
     description: (row[c.description] as string | null) ?? null,
     status: (row[c.status] as string | null) ?? null,
+    priority: (row[c.priority] as string | null) ?? null,
+    openedAt: (row[c.openedAt] as string | null) ?? null,
     createdAt: (row[c.createdAt] as string | null) ?? null,
   };
 }
@@ -93,20 +111,20 @@ export async function getMyAccess(): Promise<MyAccess | null> {
 export async function listCases(): Promise<UradCase[]> {
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
-    .select("*")
+    .select(CASE_SELECT)
     .order(c.createdAt, { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(mapCase);
+  return (data ?? []).map((row) => mapCase(row as unknown as Record<string, unknown>));
 }
 
 export async function getCase(id: string): Promise<UradCase | null> {
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
-    .select("*")
+    .select(CASE_SELECT)
     .eq(c.id, id)
     .maybeSingle();
   if (error) throw error;
-  return data ? mapCase(data) : null;
+  return data ? mapCase(data as unknown as Record<string, unknown>) : null;
 }
 
 export async function createCase(input: { title: string; description: string }) {
@@ -115,8 +133,8 @@ export async function createCase(input: { title: string; description: string }) 
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
     .insert({ [c.ownerId]: user.id, [c.title]: input.title, [c.description]: input.description })
-    .select("*")
+    .select(CASE_SELECT)
     .single();
   if (error) throw error;
-  return mapCase(data);
+  return mapCase(data as unknown as Record<string, unknown>);
 }

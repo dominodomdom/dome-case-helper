@@ -23,14 +23,24 @@ export const SCHEMA = {
   },
   cases: {
     table: "urad_cases",
-    // TODO: ověřit názvy sloupců urad_cases podle skutečného schématu
+    // Ověřeno proti skutečnému schématu public.urad_cases (16 sloupců).
     columns: {
       id: "id",
       ownerId: "user_id",
+      moduleId: "module_id",
+      caseNumber: "case_number",
       title: "title",
       description: "description",
       status: "status",
+      priority: "priority",
+      realityStatus: "reality_status",
+      currentGap: "current_gap",
+      currency: "currency",
+      openedAt: "opened_at",
+      resolvedAt: "resolved_at",
+      closedAt: "closed_at",
       createdAt: "created_at",
+      updatedAt: "updated_at",
     },
   },
 } as const;
