@@ -15,7 +15,7 @@ export const assessCase = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => z.object({ caseId: z.string().uuid(), accessToken: z.string().min(10) }).parse(d))
   .handler(async ({ data }): Promise<Result<DomeAssessment>> => {
     try {
-      const { verifyUser, generateAssessment, recordAssessmentAsServer, DomeError } = await import("./dome.server");
+      const { verifyUser, generateAssessment, recordAssessment, DomeError } = await import("./dome.server");
       const { sb, userId } = await verifyUser(data.accessToken);
       const c = SCHEMA.cases.columns;
       const s = SCHEMA.steps.columns;
@@ -57,9 +57,8 @@ export const assessCase = createServerFn({ method: "POST" })
 
       // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
       const assessment = await generateAssessment(lines.join("\n"));
-      // Opětovné explicitní ověření vlastnictví těsně před použitím service_role.
-      if ((kase.data as Record<string, unknown>)[c.ownerId] !== userId) throw new DomeError("Případ vám nepatří.", 403);
-      await recordAssessmentAsServer(data.caseId, userId, assessment);
+      // Zápis jako přihlášený uživatel; DB funkce znovu ověří identitu, přístup a vlastnictví.
+      await recordAssessment(sb, data.caseId, assessment);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
       return fail(e);
