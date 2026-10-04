@@ -60,26 +60,33 @@ function normalizeAccess(raw: unknown): MyAccess | null {
 
 /**
  * Skutečný přístupový stav z existujícího backendu.
- * 1) RPC urad_my_access(); 2) záloha: vlastní řádek urad_user_access (RLS).
+ * Detaily (status, role, důvody) poskytuje RPC urad_my_access()
+ * (záloha: vlastní řádek urad_user_access pod RLS).
+ * Autoritativní boolean povolení přístupu určuje výhradně RPC urad_has_access().
  */
 export async function getMyAccess(): Promise<MyAccess | null> {
   const sb = getSupabase();
   const a = SCHEMA.access;
+  let n: MyAccess | null = null;
   const rpc = await sb.rpc(a.myAccessRpc);
   if (!rpc.error) {
-    const n = normalizeAccess(rpc.data);
-    if (n) return n;
+    n = normalizeAccess(rpc.data);
   }
-  const user = await getCurrentUser();
-  if (!user) return null;
-  const { data, error } = await sb.from(a.table).select("*").eq(a.userIdColumn, user.id).maybeSingle();
-  if (error || !data) return null;
-  const n = normalizeAccess(data);
-  // Řádek tabulky nemá has_access; ověřit u backendu přes urad_has_access().
-  if (n) {
-    const has = await sb.rpc("urad_has_access");
-    n.hasAccess = !has.error && has.data === true;
+  if (!n) {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const { data, error } = await sb
+      .from(a.table)
+      .select("*")
+      .eq(a.userIdColumn, user.id)
+      .maybeSingle();
+    if (error || !data) return null;
+    n = normalizeAccess(data);
   }
+  if (!n) return null;
+  // Autoritativní rozhodnutí o přístupu dělá backend přes urad_has_access().
+  const has = await sb.rpc("urad_has_access");
+  n.hasAccess = !has.error && has.data === true;
   return n;
 }
 
