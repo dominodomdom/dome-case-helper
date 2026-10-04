@@ -92,3 +92,27 @@ Lhůta platí jen s citací (`deadline_mention`) obsahující lhůtu a s vazbou 
 Body 1–3 splněny a ověřeny automatickými testy. Povinný live smoke test (bod 6) nebyl proveden, takže podmínka pro READY_FOR_PHASE_2 není splněna a Fáze 2 se nespouští. Po úspěšném provedení kroků K.A–K.J lze stav změnit na READY_FOR_PHASE_2.
 
 BLOCKED
+
+---
+
+# D2 CONCURRENCY HARDENING (samostatný krok před Fází 2)
+
+## Pre-flight audit — kód aplikace (provedeno)
+- Jediná write path pro `dome_assessment`: `recordAssessment` v `src/lib/dome.server.ts`, volaná ze 2 míst v `src/lib/dome.functions.ts`: `assessCase` (nové vyhodnocení) a `updateActionStatus` (změna stavu akce). Obě volají dnes **2-param** RPC.
+- Klientský kód zapisuje do `urad_case_steps` jen `kind: "user_input"` (`urad-api.ts`); dokumenty zapisuje server jako `user_document`. Žádný kód nevkládá `dome_assessment` přímo.
+- `recordAssessment` dnes **nepředává** `expectedVersion`; verze se kontroluje jen v aplikaci (neatomicky).
+- Počáteční verze: první stav má `metadata.version = 1`, tedy očekávaná verze `0` — kompatibilní s návrhem. Legacy assessments bez `case_state` = verze 0.
+
+## Pre-flight audit — skutečné DB (NEPROVEDENO)
+Nemám přístup k SQL vašeho Supabase projektu (jen veřejný klíč, ten nečte definice funkcí, policies ani granty). Nelze tedy ověřit: definici a overloady RPC, RLS policies, granty, ani to, zda RLS policy pro INSERT do `urad_case_steps` nepovolí klientovi vložit `kind = 'dome_assessment'` přímo přes API. Připraveno ke spuštění: `supabase/d2/01_preflight_audit.sql`.
+
+## Připravené SQL (NEAPLIKOVÁNO)
+- `supabase/d2/02_migration_atomic_rpc.sql` — 3-param RPC `(uuid, jsonb, integer)`, `SELECT … FOR UPDATE` na řádku `urad_cases`, povinná `p_expected_version` (NULL odmítnuta), `CONCURRENCY_CONFLICT` (P0001), kontrola `auth.uid()`, `urad_has_access()`, vlastnictví, `hypothesis.status = 'unverified'`, nová verze = očekávaná + 1, jen INSERT.
+- `supabase/d2/03_deprecate_2param.sql` — stará funkce explicitně selže; spustit až po nasazení kódu.
+- `supabase/d2/04_concurrency_test.sql` — test dvou souběžných transakcí + negativní testy.
+
+## Kód aplikace
+Beze změny. Přepnutí `recordAssessment` na 3-param variantu by před aplikací SQL rozbilo ukládání, proto čeká na potvrzení migrace.
+
+## Gate status
+BLOCKED
