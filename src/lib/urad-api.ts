@@ -127,12 +127,23 @@ export async function getCase(id: string): Promise<UradCase | null> {
   return data ? mapCase(data as unknown as Record<string, unknown>) : null;
 }
 
+/**
+ * Vytvoří skutečný případ v public.urad_cases.
+ * user_id z aktuální session, module_id = modul ÚŘAD; ostatní hodnoty
+ * (status, priority, reality_status, current_gap, currency, opened_at, …)
+ * necháváme na databázových defaultech. Izolaci řídí RLS.
+ */
 export async function createCase(input: { title: string; description: string }) {
   const user = await getCurrentUser();
   if (!user) throw new Error("Nejste přihlášeni.");
   const { data, error } = await getSupabase()
     .from(SCHEMA.cases.table)
-    .insert({ [c.ownerId]: user.id, [c.title]: input.title, [c.description]: input.description })
+    .insert({
+      [c.ownerId]: user.id,
+      [c.moduleId]: SCHEMA.cases.moduleId,
+      [c.title]: input.title,
+      [c.description]: input.description,
+    })
     .select(CASE_SELECT)
     .single();
   if (error) throw error;
