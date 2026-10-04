@@ -124,7 +124,7 @@ export async function getCase(id: string): Promise<UradCase | null> {
     .eq(c.id, id)
     .maybeSingle();
   if (error) throw error;
-  return data ? mapCase(data) : null;
+  return data ? mapCase(data as unknown as Record<string, unknown>) : null;
 }
 
 export async function createCase(input: { title: string; description: string }) {
