@@ -26,7 +26,7 @@ type Props = {
   state: HandoffState;
   disabled: boolean;
   onChoice: (id: ChoiceId) => void;
-  onArea?: (text: string) => void;
+  onArea?: ((text: string) => void) | undefined;
 };
 
 /**
