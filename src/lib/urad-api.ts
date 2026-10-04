@@ -3,20 +3,38 @@ import { SCHEMA } from "./supabase-config";
 
 export type UradCase = {
   id: string;
+  caseNumber: string | null;
   title: string;
   description: string | null;
   status: string | null;
+  priority: string | null;
+  openedAt: string | null;
   createdAt: string | null;
 };
 
 const c = SCHEMA.cases.columns;
 
+/** Explicitní projekce skutečných sloupců public.urad_cases. */
+const CASE_SELECT = [
+  c.id,
+  c.caseNumber,
+  c.title,
+  c.description,
+  c.status,
+  c.priority,
+  c.openedAt,
+  c.createdAt,
+].join(",");
+
 function mapCase(row: Record<string, unknown>): UradCase {
   return {
     id: String(row[c.id]),
+    caseNumber: (row[c.caseNumber] as string | null) ?? null,
     title: (row[c.title] as string) ?? "Bez názvu",
     description: (row[c.description] as string | null) ?? null,
     status: (row[c.status] as string | null) ?? null,
+    priority: (row[c.priority] as string | null) ?? null,
+    openedAt: (row[c.openedAt] as string | null) ?? null,
     createdAt: (row[c.createdAt] as string | null) ?? null,
   };
 }
