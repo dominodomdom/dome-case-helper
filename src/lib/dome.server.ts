@@ -30,8 +30,8 @@ export async function verifyUser(accessToken: string) {
  * Klient vzniká jen zde, jen na serveru, a nikdy se nevrací ani neukládá.
  */
 export async function recordAssessmentAsServer(caseId: string, userId: string, assessment: Record<string, unknown>) {
-  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
-  if (!key) throw new DomeError("Server nemá nastavený klíč pro ukládání hodnocení (SUPABASE_SERVICE_ROLE_KEY).", 500);
+  const key = process.env["URAD_SUPABASE_SERVICE_ROLE_KEY"];
+  if (!key) throw new DomeError("Server nemá nastavený klíč pro ukládání hodnocení (URAD_SUPABASE_SERVICE_ROLE_KEY).", 500);
   const admin = createClient(SUPABASE_URL, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
