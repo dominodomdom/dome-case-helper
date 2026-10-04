@@ -44,6 +44,8 @@ async function loadCaseContext(caseId: string, accessToken: string) {
   ];
   const rows = (steps.data ?? []) as Record<string, unknown>[];
   let documents = 0;
+  const documentNames: string[] = [];
+  const documentText: string[] = [];
   const choices: ChoiceId[] = [];
   const userText: string[] = [String(row[c.title] ?? ""), String(row[c.description] ?? "")];
   let previous: HumanHandoff | null = null;
@@ -58,6 +60,8 @@ async function loadCaseContext(caseId: string, accessToken: string) {
       lines.push(`${i + 1}. UŽIVATEL: ${r[s.content]}`);
     } else if (kind === "user_document") {
       documents++;
+      documentNames.push(String(r[s.documentName] ?? ""));
+      documentText.push(String(r[s.content] ?? ""));
       lines.push(`${i + 1}. UŽIVATEL NAHRÁL DOKUMENT "${r[s.documentName]}". Obsah zjištěný z dokumentu: ${r[s.content] ?? "(nepodařilo se přečíst)"}`);
     } else if (kind === "dome_assessment") {
       const a = r[s.assessment] as { current_question?: { text?: string }; intervention_level?: string; handoff_state?: string; human_handoff?: HumanHandoff } | null;
@@ -66,7 +70,21 @@ async function loadCaseContext(caseId: string, accessToken: string) {
       lines.push(`${i + 1}. DOME (úroveň ${a?.intervention_level ?? "?"}, stav ${a?.handoff_state ?? "?"}) SE ZEPTAL: ${a?.current_question?.text ?? ""}`);
     }
   });
-  return { sb, userId, context: lines.join("\n"), documents, choices, userText: userText.join("\n"), previous, lastAssessment };
+  return { sb, userId, context: lines.join("\n"), documents, choices, userText: userText.join("\n"), previous, lastAssessment, documentNames, evidenceText: [...userText, ...documentText].join("\n") };
+}
+
+/** Poslední uložený assessment případu (pro kontrolu verze těsně před zápisem). */
+async function readLatestAssessment(sb: Awaited<ReturnType<typeof loadCaseContext>>["sb"], caseId: string): Promise<Record<string, unknown> | null> {
+  const s = SCHEMA.steps.columns;
+  const { DomeError } = await import("./dome.server");
+  const r = await sb.from(SCHEMA.steps.table).select(s.assessment).eq(s.caseId, caseId).eq(s.kind, "dome_assessment")
+    .order(s.createdAt, { ascending: false }).limit(1).maybeSingle();
+  if (r.error) throw new DomeError(`Stav případu nelze ověřit: ${r.error.message}`);
+  return ((r.data as Record<string, unknown> | null)?.[s.assessment] as Record<string, unknown> | null) ?? null;
+}
+const stateVersion = (a: Record<string, unknown> | null) => {
+  const v = (a?.["case_state"] as { metadata?: { version?: number } } | undefined)?.metadata?.version;
+  return typeof v === "number" ? v : 0;
 }
 
 /** Vyhodnotí celý případ a uloží nový dome_assessment přes RPC urad_record_dome_assessment. */
@@ -75,25 +93,29 @@ export const assessCase = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result<DomeAssessment>> => {
     try {
       const { generateAssessment, recordAssessment } = await import("./dome.server");
-      const { sb, context, choices, userText, previous, lastAssessment, documents } = await loadCaseContext(data.caseId, data.accessToken);
+      const { sb, context, choices, userText, previous, lastAssessment, documents, documentNames, evidenceText } = await loadCaseContext(data.caseId, data.accessToken);
       // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
       const assessment = await generateAssessment(`${context}\n\nVyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.`, "urad", choices, { caseId: data.caseId, userText, previous });
       // CASE CORE: canonical stav → validace → uložit jen platný stav.
       const { buildCaseState, normalizeCaseState, validateCaseState } = await import("./case-state");
       const { DomeError } = await import("./dome.server");
-      const prevState = normalizeCaseState(lastAssessment, data.caseId);
+      // Během AI běhu mohl uživatel změnit akce → stavíme vždy nad nejnovějším uloženým stavem (jeho volby se nepřepíšou).
+      const latestBeforeBuild = await readLatestAssessment(sb, data.caseId);
+      const prevState = normalizeCaseState(latestBeforeBuild ?? lastAssessment, data.caseId);
       const caseState = buildCaseState({
         caseId: data.caseId,
         userGoal: (assessment["user_goal"] as { text?: string } | undefined)?.text ?? null,
         interpretation: (assessment["hypothesis"] as { text?: string } | undefined)?.text ?? null,
         draft: assessment["case_draft"] as never,
-        userText, documents,
+        userText, documents, documentNames, evidenceText,
         previous: prevState && !prevState.metadata.legacy_normalized ? prevState : prevState ? { ...prevState, actions: [] } : null,
       });
       const errs = validateCaseState(caseState);
       if (errs.length) throw new DomeError(`Vyhodnocení nemá platnou strukturu, nic se neuložilo. (${errs.slice(0, 3).join("; ")})`, 502);
       delete assessment["case_draft"];
       assessment["case_state"] = caseState;
+      if (stateVersion(await readLatestAssessment(sb, data.caseId)) !== stateVersion(latestBeforeBuild))
+        throw new DomeError("Případ se mezitím změnil, vyhodnocení se neuložilo. Zkuste to znovu.", 409);
       await recordAssessment(sb, data.caseId, assessment);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
@@ -198,6 +220,8 @@ export const updateActionStatus = createServerFn({ method: "POST" })
       const errs = validateCaseState(next);
       if (errs.length) throw new DomeError(`Změnu nelze uložit: ${errs[0]}`, 422);
       const act = next.actions.find((a) => a.id === data.actionId)!;
+      if (stateVersion(await readLatestAssessment(sb, data.caseId)) !== current.metadata.version)
+        throw new DomeError("Stav případu se mezitím změnil. Obnovte stránku.", 409);
       await recordAssessment(sb, data.caseId, { ...(lastAssessment as Record<string, unknown>), case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` });
       return { ok: true, data: { version: next.metadata.version } };
     } catch (e) {
