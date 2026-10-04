@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SCHEMA, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config";
-import { buildSystemPrompt, enforceAssessmentInvariants, ASSESSMENT_SCHEMA, HANDOFF_SCHEMA, HANDOFF_SYSTEM, type ChoiceId, type DomainId } from "./dome-core";
+import { buildSystemPrompt, enforceAssessmentInvariants, ASSESSMENT_SCHEMA, HANDOFF_SCHEMA, HANDOFF_SYSTEM, type ChoiceId, type DomainId, deriveHandoffState } from "./dome-core";
+import { applySupportEngine, type HumanHandoff } from "./support-engine";
 
 /** Serverový klient jednající JAKO přihlášený uživatel (publishable klíč + jeho token, RLS platí). */
 export function userClient(accessToken: string): SupabaseClient {
@@ -105,7 +106,12 @@ export async function callAi(input: Input, jsonSchema?: { name: string; schema: 
   return text;
 }
 
-export async function generateAssessment(context: string, domain: DomainId = "urad", choices: ChoiceId[] = []) {
+export async function generateAssessment(
+  context: string,
+  domain: DomainId = "urad",
+  choices: ChoiceId[] = [],
+  engine: { caseId: string; userText: string; previous?: HumanHandoff | null } | null = null,
+) {
   const raw = await callAi(
     [
       { role: "system", content: buildSystemPrompt(domain) },
@@ -113,7 +119,15 @@ export async function generateAssessment(context: string, domain: DomainId = "ur
     ],
     { name: "dome_assessment", schema: ASSESSMENT_SCHEMA },
   );
-  return enforceAssessmentInvariants(JSON.parse(raw) as Record<string, unknown>, { choices });
+  const a = enforceAssessmentInvariants(JSON.parse(raw) as Record<string, unknown>, { choices });
+  if (!engine) return a;
+  // Registr služeb ani dopravu zatím žádný ověřený zdroj nedodává → NO_REGISTRY / NO_TRANSPORT.
+  return applySupportEngine(a, {
+    ...engine,
+    choices,
+    derive: (level, gapDetected, targetVerified, routeVerified) =>
+      deriveHandoffState({ choices, level, gapDetected, targetVerified, routeVerified }),
+  });
 }
 
 export async function generateHandoff(context: string) {
