@@ -154,3 +154,61 @@ export async function createCase(input: { title: string; description: string }) 
   }
   return mapCase(data as unknown as Record<string, unknown>);
 }
+
+/* ---------- Kroky případu (public.urad_case_steps) ---------- */
+
+export type DomeAssessment = {
+  hypothesis: { text: string; status: "unverified" };
+  stated_by_user: string[];
+  verified: string[];
+  to_verify: string[];
+  missing_information: string[];
+  required_documents: string[];
+  current_question: { text: string; reason: string };
+  next_step: { text: string; condition: string };
+  confidence: "low" | "medium";
+};
+
+export type CaseStep = {
+  id: string;
+  kind: "user_input" | "user_document" | "dome_assessment";
+  content: string | null;
+  documentName: string | null;
+  assessment: DomeAssessment | null;
+  createdAt: string;
+};
+
+const s = SCHEMA.steps.columns;
+
+export async function listSteps(caseId: string): Promise<CaseStep[]> {
+  const { data, error } = await getSupabase()
+    .from(SCHEMA.steps.table)
+    .select([s.id, s.kind, s.content, s.documentName, s.assessment, s.createdAt].join(","))
+    .eq(s.caseId, caseId)
+    .order(s.createdAt, { ascending: true });
+  if (error) throw new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+    id: String(r[s.id]),
+    kind: r[s.kind] as CaseStep["kind"],
+    content: (r[s.content] as string | null) ?? null,
+    documentName: (r[s.documentName] as string | null) ?? null,
+    assessment: (r[s.assessment] as DomeAssessment | null) ?? null,
+    createdAt: String(r[s.createdAt]),
+  }));
+}
+
+/** Uloží odpověď uživatele jako samostatný krok (user_id doplní DB z auth.uid(), RLS platí). */
+export async function addUserInput(caseId: string, content: string) {
+  const { error } = await getSupabase()
+    .from(SCHEMA.steps.table)
+    .insert({ [s.caseId]: caseId, [s.kind]: "user_input", [s.content]: content });
+  if (error) throw new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
+}
+
+/** Přístupový token aktuální session pro serverové funkce DOME. */
+export async function getAccessToken(): Promise<string> {
+  const { data } = await getSupabase().auth.getSession();
+  const t = data.session?.access_token;
+  if (!t) throw new Error("Nejste přihlášeni.");
+  return t;
+}

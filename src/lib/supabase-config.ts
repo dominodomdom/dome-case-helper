@@ -17,6 +17,7 @@ export const SCHEMA = {
   access: {
     /** RPC vracející přístupový stav přihlášeného uživatele */
     myAccessRpc: "urad_my_access",
+    hasAccessRpc: "urad_has_access",
     /** Záložní čtení vlastního záznamu (chráněno RLS) */
     table: "urad_user_access",
     userIdColumn: "user_id",
@@ -43,6 +44,21 @@ export const SCHEMA = {
       closedAt: "closed_at",
       createdAt: "created_at",
       updatedAt: "updated_at",
+    },
+  },
+  steps: {
+    table: "urad_case_steps",
+    /** dome_assessment smí zapisovat jen serverová vrstva přes toto RPC */
+    recordAssessmentRpc: "urad_record_dome_assessment",
+    columns: {
+      id: "id",
+      caseId: "case_id",
+      userId: "user_id",
+      kind: "kind",
+      content: "content",
+      documentName: "document_name",
+      assessment: "assessment",
+      createdAt: "created_at",
     },
   },
 } as const;
