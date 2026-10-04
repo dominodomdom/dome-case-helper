@@ -1,7 +1,7 @@
 /**
  * Napojení na EXISTUJÍCÍ Supabase projekt DOME OS.
- * Žádný nový backend se nevytváří. Hodnoty níže je nutné sladit
- * se skutečným schématem modulu ÚŘAD v existujícím projektu.
+ * Žádný nový backend se nevytváří. Používá se pouze veřejný publishable/anon klíč.
+ * Nikdy sem nevkládat service_role klíč.
  */
 export const SUPABASE_URL =
   (import.meta.env["VITE_SUPABASE_URL"] as string | undefined) ??
@@ -11,20 +11,18 @@ export const SUPABASE_URL =
 export const SUPABASE_PUBLISHABLE_KEY =
   (import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] as string | undefined) ?? "";
 
-/**
- * MAPOVÁNÍ NA EXISTUJÍCÍ SCHÉMA — TODO: ověřit podle skutečných tabulek.
- * Frontend nikdy nevytváří tabulky; jen čte/zapisuje do těchto existujících.
- */
+/** Skutečné objekty existujícího schématu modulu ÚŘAD. */
 export const SCHEMA = {
-  /** Tabulka se stavem schválení uživatele */
-  approval: {
-    table: "profiles",
-    userIdColumn: "id",
-    statusColumn: "approved", // boolean, nebo stav (viz isApproved)
+  access: {
+    /** RPC vracející přístupový stav přihlášeného uživatele */
+    myAccessRpc: "urad_my_access",
+    /** Záložní čtení vlastního záznamu (chráněno RLS) */
+    table: "urad_user_access",
+    userIdColumn: "user_id",
   },
-  /** Tabulka případů modulu ÚŘAD */
   cases: {
     table: "urad_cases",
+    // TODO: ověřit názvy sloupců urad_cases podle skutečného schématu
     columns: {
       id: "id",
       ownerId: "user_id",
