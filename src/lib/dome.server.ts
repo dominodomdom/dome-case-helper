@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SCHEMA, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config";
-import { buildSystemPrompt, enforceAssessmentInvariants, ASSESSMENT_SCHEMA, HANDOFF_SCHEMA, HANDOFF_SYSTEM, type DomainId } from "./dome-core";
+import { buildSystemPrompt, enforceAssessmentInvariants, ASSESSMENT_SCHEMA, HANDOFF_SCHEMA, HANDOFF_SYSTEM, type ChoiceId, type DomainId } from "./dome-core";
 
 /** Serverový klient jednající JAKO přihlášený uživatel (publishable klíč + jeho token, RLS platí). */
 export function userClient(accessToken: string): SupabaseClient {
@@ -105,7 +105,7 @@ export async function callAi(input: Input, jsonSchema?: { name: string; schema: 
   return text;
 }
 
-export async function generateAssessment(context: string, domain: DomainId = "urad") {
+export async function generateAssessment(context: string, domain: DomainId = "urad", choices: ChoiceId[] = []) {
   const raw = await callAi(
     [
       { role: "system", content: buildSystemPrompt(domain) },
@@ -113,7 +113,7 @@ export async function generateAssessment(context: string, domain: DomainId = "ur
     ],
     { name: "dome_assessment", schema: ASSESSMENT_SCHEMA },
   );
-  return enforceAssessmentInvariants(JSON.parse(raw) as Record<string, unknown>);
+  return enforceAssessmentInvariants(JSON.parse(raw) as Record<string, unknown>, { choices });
 }
 
 export async function generateHandoff(context: string) {
