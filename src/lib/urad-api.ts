@@ -136,5 +136,5 @@ export async function createCase(input: { title: string; description: string }) 
     .select(CASE_SELECT)
     .single();
   if (error) throw error;
-  return mapCase(data as Record<string, unknown>);
+  return mapCase(data as unknown as Record<string, unknown>);
 }
