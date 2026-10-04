@@ -124,6 +124,6 @@ export async function generateHandoff(context: string) {
     ],
     { name: "dome_handoff", schema: HANDOFF_SCHEMA },
   );
-  const h = JSON.parse(raw) as { items?: { label?: string; text?: string }[] } & Record<string, unknown>;
+  const h = JSON.parse(raw) as { items?: { section?: string; label?: string; text?: string }[] } & Record<string, unknown>;
   return h;
 }
