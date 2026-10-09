@@ -110,13 +110,14 @@ export const assessCase = createServerFn({ method: "POST" })
         userText, documents, documentNames, evidenceText,
         previous: prevState && !prevState.metadata.legacy_normalized ? prevState : prevState ? { ...prevState, actions: [] } : null,
       });
+      // Verze = poslední uložená verze (počáteční stav / legacy = 0); nová = +1. Atomicky ověří DB.
+      const expectedVersion = stateVersion(latestBeforeBuild);
+      caseState.metadata.version = expectedVersion + 1;
       const errs = validateCaseState(caseState);
       if (errs.length) throw new DomeError(`Vyhodnocení nemá platnou strukturu, nic se neuložilo. (${errs.slice(0, 3).join("; ")})`, 502);
       delete assessment["case_draft"];
       assessment["case_state"] = caseState;
-      if (stateVersion(await readLatestAssessment(sb, data.caseId)) !== stateVersion(latestBeforeBuild))
-        throw new DomeError("Případ se mezitím změnil, vyhodnocení se neuložilo. Zkuste to znovu.", 409);
-      await recordAssessment(sb, data.caseId, assessment);
+      await recordAssessment(sb, data.caseId, assessment, expectedVersion);
       return { ok: true, data: assessment as unknown as DomeAssessment };
     } catch (e) {
       return fail(e);
@@ -220,9 +221,7 @@ export const updateActionStatus = createServerFn({ method: "POST" })
       const errs = validateCaseState(next);
       if (errs.length) throw new DomeError(`Změnu nelze uložit: ${errs[0]}`, 422);
       const act = next.actions.find((a) => a.id === data.actionId)!;
-      if (stateVersion(await readLatestAssessment(sb, data.caseId)) !== current.metadata.version)
-        throw new DomeError("Stav případu se mezitím změnil. Obnovte stránku.", 409);
-      await recordAssessment(sb, data.caseId, { ...(lastAssessment as Record<string, unknown>), case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` });
+      await recordAssessment(sb, data.caseId, { ...(lastAssessment as Record<string, unknown>), case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` }, current.metadata.version);
       return { ok: true, data: { version: next.metadata.version } };
     } catch (e) {
       return fail(e);
