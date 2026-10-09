@@ -116,3 +116,26 @@ Beze změny. Přepnutí `recordAssessment` na 3-param variantu by před aplikac�
 
 ## Gate status
 BLOCKED
+
+## D2 — po aplikaci SQL (2026-10-09)
+DB změna: 3-param RPC `urad_record_dome_assessment(uuid, jsonb, integer)` vytvořena v Supabase uživatelem (podle `supabase/d2/02_migration_atomic_rpc.sql`). Živě ověřeno z tohoto prostředí: anonymní volání 3-param i 2-param → `42501 permission denied for function`; anonymní čtení `urad_case_steps` → `42501`.
+
+Změněné soubory: `src/lib/dome.server.ts`, `src/lib/dome.functions.ts`, `src/test/d2-concurrency.test.ts` (nový), `AGENTS.md`, tento report.
+
+Write paths (obě přes `recordAssessment` → 3-param RPC, jediná cesta zápisu `dome_assessment`):
+- `assessCase`: `expectedVersion` = verze posledního uloženého assessmentu (počáteční / legacy = 0); nová verze se nastaví na `expected + 1`.
+- `updateActionStatus`: `expectedVersion` = aktuální verze stavu.
+- Odstraněny neatomické kontroly „přečti verzi → zapiš" před RPC; autoritou je DB zámek. `updateActionStatus` dál odmítá požadavek se zastaralou verzí z UI hned na začátku.
+- `recordAssessment` odmítne (422) bez volání DB: chybějící/zápornou/neceločíselnou verzi a novou verzi ≠ expected + 1. `CONCURRENCY_CONFLICT` (P0001) → HTTP 409 se srozumitelnou hláškou; jiné P0001 (např. deprecated) konfliktem nejsou.
+
+Testy: 54/54 (nově 7 D2 testů: 3-param volání a verze 0 → 1, dvě souběžné transakce → 1 uložena + 1× 409, 10 souběžných → 1 uložena, zastaralá verze → 409, překlad P0001 → 409, neplatné verze bez volání DB, negativní scénáře bez zápisu, jiné P0001 ≠ 409). Souběh je simulován věrnou napodobeninou RPC se serializujícím zámkem — **ne** proti skutečné DB. Type check OK. Produkční build OK.
+
+Bezpečnost: klientský bundle neobsahuje service_role ani secret klíč; obsahuje jen název RPC jako konstantu v konfiguraci, browser ho nevolá (volá jen server). Žádná změna RLS/GRANTů z aplikace.
+
+Neověřeno (vyžaduje vás):
+1. `supabase/d2/04_concurrency_test.sql` — test dvou skutečných transakcí v DB.
+2. Výstup `01_preflight_audit.sql`, hlavně zda RLS INSERT policy na `urad_case_steps` nedovolí klientovi vložit `kind = 'dome_assessment'` přímo.
+3. Živé uložení v přihlášeném účtu (vyhodnocení + změna akce + konflikt ve dvou záložkách) s novou funkcí.
+4. Až bude 3 OK: `03_deprecate_2param.sql`.
+
+Gate status: BLOCKED (do potvrzení bodů 1–3).
