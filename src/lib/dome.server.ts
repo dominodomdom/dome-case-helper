@@ -37,8 +37,8 @@ export const CONCURRENCY_CONFLICT_MESSAGE = "Stav případu se mezitím změnil,
 
 export function isConcurrencyConflict(err: { code?: string | null; message?: string | null } | null | undefined): boolean {
   if (!err) return false;
-  return err.code === "P0001" && /CONCURRENCY_CONFLICT/.test(err.message ?? "")
-    || /CONCURRENCY_CONFLICT/.test(err.message ?? "");
+  // DB hlásí konflikt jako RAISE 'CONCURRENCY_CONFLICT' (SQLSTATE P0001). Jiné P0001 (např. deprecated) konfliktem nejsou.
+  return /CONCURRENCY_CONFLICT/.test(err.message ?? "");
 }
 
 export async function recordAssessment(sb: SupabaseClient, caseId: string, assessment: Record<string, unknown>, expectedVersion: number) {

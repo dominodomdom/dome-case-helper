@@ -82,7 +82,7 @@ async function readLatestAssessment(sb: Awaited<ReturnType<typeof loadCaseContex
   if (r.error) throw new DomeError(`Stav případu nelze ověřit: ${r.error.message}`);
   return ((r.data as Record<string, unknown> | null)?.[s.assessment] as Record<string, unknown> | null) ?? null;
 }
-export const stateVersion = (a: Record<string, unknown> | null) => {
+const stateVersion = (a: Record<string, unknown> | null) => {
   const v = (a?.["case_state"] as { metadata?: { version?: number } } | undefined)?.metadata?.version;
   return typeof v === "number" ? v : 0;
 }
