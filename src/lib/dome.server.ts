@@ -28,15 +28,30 @@ export async function verifyUser(accessToken: string) {
 }
 
 /**
- * Uloží assessment přes dvouparametrické RPC jako přihlášený uživatel.
- * Funkce v DB (SECURITY DEFINER) sama ověřuje auth.uid(), urad_has_access(), vlastnictví a hypothesis.status.
+ * Uloží assessment přes atomickou 3-param RPC urad_record_dome_assessment(p_case_id, p_assessment, p_expected_version)
+ * jako přihlášený uživatel. DB (SECURITY DEFINER) zamkne řádek případu (FOR UPDATE), ověří auth.uid(), urad_has_access(),
+ * vlastnictví, hypothesis.status = 'unverified' a že poslední uložená verze == p_expected_version.
+ * Počáteční stav: expectedVersion = 0. Nová verze v assessmentu musí být expectedVersion + 1.
  */
-export async function recordAssessment(sb: SupabaseClient, caseId: string, assessment: Record<string, unknown>) {
+export const CONCURRENCY_CONFLICT_MESSAGE = "Stav případu se mezitím změnil, nic se neuložilo. Obnovte stránku.";
+
+export function isConcurrencyConflict(err: { code?: string | null; message?: string | null } | null | undefined): boolean {
+  if (!err) return false;
+  return err.code === "P0001" && /CONCURRENCY_CONFLICT/.test(err.message ?? "")
+    || /CONCURRENCY_CONFLICT/.test(err.message ?? "");
+}
+
+export async function recordAssessment(sb: SupabaseClient, caseId: string, assessment: Record<string, unknown>, expectedVersion: number) {
+  if (!Number.isInteger(expectedVersion) || expectedVersion < 0) throw new DomeError("Chybí platná verze stavu případu, nic se neuložilo.", 422);
+  const newVersion = (assessment["case_state"] as { metadata?: { version?: unknown } } | undefined)?.metadata?.version;
+  if (newVersion !== expectedVersion + 1) throw new DomeError("Neplatná nová verze stavu případu, nic se neuložilo.", 422);
   const rec = await sb.rpc(SCHEMA.steps.recordAssessmentRpc, {
     p_case_id: caseId,
     p_assessment: assessment,
+    p_expected_version: expectedVersion,
   });
   if (rec.error) {
+    if (isConcurrencyConflict(rec.error)) throw new DomeError(CONCURRENCY_CONFLICT_MESSAGE, 409);
     console.error("urad_record_dome_assessment", rec.error);
     throw new DomeError(`Hodnocení se nepodařilo uložit: ${rec.error.message} (kód: ${rec.error.code ?? "?"})`);
   }
