@@ -21,7 +21,9 @@ describe("AI provider boundary", () => {
     );
     const p = createLovableGatewayProvider({ LOVABLE_API_KEY: "k" }, f as never);
     expect(await p.complete("ahoj", { name: "x", schema: {} })).toBe('{"a":1}');
-    const body = JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    const body = JSON.parse(
+      (f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    );
     expect(body.text.format.name).toBe("x");
   });
 
@@ -44,8 +46,10 @@ describe("AI provider boundary", () => {
     [500, 502],
   ])("HTTP %i maps to status %i", async (http, status) => {
     vi.spyOn(console, "error").mockImplementation(() => {});
-    const p = createLovableGatewayProvider({ LOVABLE_API_KEY: "k" }, (async () =>
-      new Response("err", { status: http })) as never);
+    const p = createLovableGatewayProvider(
+      { LOVABLE_API_KEY: "k" },
+      (async () => new Response("err", { status: http })) as never,
+    );
     await expect(p.complete("x")).rejects.toMatchObject({ status });
   });
 
@@ -56,9 +60,10 @@ describe("AI provider boundary", () => {
       status: 422,
     });
     await expect(
-      mk([{ type: "response.output_text.delta", delta: "{" }, { type: "response.failed" }]).complete(
-        "x",
-      ),
+      mk([
+        { type: "response.output_text.delta", delta: "{" },
+        { type: "response.failed" },
+      ]).complete("x"),
     ).rejects.toMatchObject({ status: 502 });
     await expect(mk([]).complete("x")).rejects.toMatchObject({ status: 502 });
   });
