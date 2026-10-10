@@ -1,6 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { SCHEMA, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "./supabase-config";
 import {
+  AiProviderError,
+  getAiProvider,
+  type AiInput,
+  type AiJsonSchema,
+} from "./ai-provider.server";
+import {
   buildSystemPrompt,
   enforceAssessmentInvariants,
   ASSESSMENT_SCHEMA,
@@ -83,89 +89,14 @@ export async function recordAssessment(
   }
 }
 
-type Input = string | Record<string, unknown>[];
-
-/** Volání Lovable AI (Responses, stream) se strukturovaným výstupem. Bez automatických opakování. */
-export async function callAi(
-  input: Input,
-  jsonSchema?: { name: string; schema: unknown },
-): Promise<string> {
-  const apiKey = process.env["LOVABLE_API_KEY"];
-  if (!apiKey) throw new DomeError("AI není nakonfigurována.", 500);
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Lovable-API-Key": apiKey,
-      "X-Lovable-AIG-SDK": "fetch",
-    },
-    body: JSON.stringify({
-      model: "openai/gpt-6-astra",
-      input,
-      stream: true,
-      store: false,
-      reasoning: { effort: "medium", summary: "auto" },
-      include: ["reasoning.encrypted_content"],
-      ...(jsonSchema
-        ? {
-            text: {
-              format: {
-                type: "json_schema",
-                name: jsonSchema.name,
-                schema: jsonSchema.schema,
-                strict: true,
-              },
-            },
-          }
-        : {}),
-    }),
-  });
-  if (!res.ok || !res.body) {
-    const body = await res.text().catch(() => "");
-    console.error(`AI gateway ${res.status}: ${body}`);
-    if (res.status === 402)
-      throw new DomeError(
-        "Došly AI kredity pracovního prostoru. Doplňte je prosím a zkuste to znovu.",
-        402,
-      );
-    if (res.status === 429)
-      throw new DomeError("DOME je teď přetížený. Zkuste to prosím za chvíli.", 429);
-    if (res.status === 403) throw new DomeError("AI požadavek byl odmítnut.", 403);
+/** Volání AI přes hranici AiProvider (výchozí: Lovable AI Gateway). Bez automatických opakování. */
+export async function callAi(input: AiInput, jsonSchema?: AiJsonSchema): Promise<string> {
+  try {
+    return await getAiProvider().complete(input, jsonSchema);
+  } catch (e) {
+    if (e instanceof AiProviderError) throw new DomeError(e.message, e.status);
     throw new DomeError("Vyhodnocení se nepodařilo. Zkuste to prosím znovu.", 502);
   }
-  const reader = res.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  let text = "";
-  let refused = false;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let i;
-    while ((i = buf.indexOf("\n\n")) >= 0) {
-      const frame = buf.slice(0, i);
-      buf = buf.slice(i + 2);
-      for (const line of frame.split("\n")) {
-        if (!line.startsWith("data:")) continue;
-        const d = line.slice(5).trim();
-        if (!d || d === "[DONE]") continue;
-        try {
-          const ev = JSON.parse(d);
-          if (ev.type === "response.output_text.delta") text += ev.delta ?? "";
-          else if (ev.type === "response.refusal.delta") refused = true;
-          else if (ev.type === "error" || ev.type === "response.failed") {
-            throw new DomeError("Vyhodnocení se nepodařilo dokončit.", 502);
-          }
-        } catch (e) {
-          if (e instanceof DomeError) throw e;
-        }
-      }
-    }
-  }
-  if (refused) throw new DomeError("AI odmítla tento požadavek zpracovat.", 422);
-  if (!text.trim()) throw new DomeError("AI nevrátila žádný výsledek.", 502);
-  return text;
 }
 
 export async function generateAssessment(
