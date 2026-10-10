@@ -334,14 +334,12 @@ export async function applySupportEngine(
       }
     : null;
   sp["navigation_available"] = !!plan;
-  sp["alternatives"] = matches
-    .slice(1, 4)
-    .map((s) => ({
-      name: s.name,
-      address: s.address,
-      source: s.source,
-      verified_at: s.source_verified_at,
-    }));
+  sp["alternatives"] = matches.slice(1, 4).map((s) => ({
+    name: s.name,
+    address: s.address,
+    source: s.source,
+    verified_at: s.source_verified_at,
+  }));
 
   const state = ctx.derive(lvl, gap.detected, !!target, !!plan);
   a["handoff_state"] = state;
