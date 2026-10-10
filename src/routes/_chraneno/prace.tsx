@@ -5,7 +5,9 @@ import { listCases } from "@/lib/urad-api";
 import { CaseCard } from "@/components/dome/CaseCard";
 
 export const Route = createFileRoute("/_chraneno/prace")({
-  head: () => ({ meta: [{ title: "Moje případy — DOME OS ÚŘAD" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({
+    meta: [{ title: "Moje případy — DOME OS ÚŘAD" }, { name: "robots", content: "noindex" }],
+  }),
   component: Dashboard,
 });
 
@@ -26,12 +28,16 @@ function Dashboard() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Vaše případy</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          Vaše případy
+        </h2>
         {q.isPending && <p className="text-muted-foreground">Načítám…</p>}
         {q.isError && (
           <p className="text-destructive">
             Případy se nepodařilo načíst.
-            {q.error instanceof Error && <span className="block text-xs opacity-80">{q.error.message}</span>}
+            {q.error instanceof Error && (
+              <span className="block text-xs opacity-80">{q.error.message}</span>
+            )}
           </p>
         )}
         {q.data?.length === 0 && (
@@ -40,7 +46,9 @@ function Dashboard() {
           </p>
         )}
         <div className="space-y-3">
-          {q.data?.map((c) => <CaseCard key={c.id} item={c} />)}
+          {q.data?.map((c) => (
+            <CaseCard key={c.id} item={c} />
+          ))}
         </div>
       </section>
     </div>

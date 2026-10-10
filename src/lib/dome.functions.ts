@@ -8,7 +8,8 @@ import { enforceHandoffLabels, parseChoice, type ChoiceId } from "./dome-core";
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 function fail(e: unknown): { ok: false; error: string } {
-  if (e && typeof e === "object" && "message" in e) return { ok: false, error: String((e as Error).message) };
+  if (e && typeof e === "object" && "message" in e)
+    return { ok: false, error: String((e as Error).message) };
   return { ok: false, error: "Neočekávaná chyba." };
 }
 
@@ -62,30 +63,65 @@ async function loadCaseContext(caseId: string, accessToken: string) {
       documents++;
       documentNames.push(String(r[s.documentName] ?? ""));
       documentText.push(String(r[s.content] ?? ""));
-      lines.push(`${i + 1}. UŽIVATEL NAHRÁL DOKUMENT "${r[s.documentName]}". Obsah zjištěný z dokumentu: ${r[s.content] ?? "(nepodařilo se přečíst)"}`);
+      lines.push(
+        `${i + 1}. UŽIVATEL NAHRÁL DOKUMENT "${r[s.documentName]}". Obsah zjištěný z dokumentu: ${r[s.content] ?? "(nepodařilo se přečíst)"}`,
+      );
     } else if (kind === "dome_assessment") {
-      const a = r[s.assessment] as { current_question?: { text?: string }; intervention_level?: string; handoff_state?: string; human_handoff?: HumanHandoff } | null;
+      const a = r[s.assessment] as {
+        current_question?: { text?: string };
+        intervention_level?: string;
+        handoff_state?: string;
+        human_handoff?: HumanHandoff;
+      } | null;
       if (a?.human_handoff) previous = a.human_handoff;
       if (a) lastAssessment = a as Record<string, unknown>;
-      lines.push(`${i + 1}. DOME (úroveň ${a?.intervention_level ?? "?"}, stav ${a?.handoff_state ?? "?"}) SE ZEPTAL: ${a?.current_question?.text ?? ""}`);
+      lines.push(
+        `${i + 1}. DOME (úroveň ${a?.intervention_level ?? "?"}, stav ${a?.handoff_state ?? "?"}) SE ZEPTAL: ${a?.current_question?.text ?? ""}`,
+      );
     }
   });
-  return { sb, userId, context: lines.join("\n"), documents, choices, userText: userText.join("\n"), previous, lastAssessment, documentNames, evidenceText: [...userText, ...documentText].join("\n") };
+  return {
+    sb,
+    userId,
+    context: lines.join("\n"),
+    documents,
+    choices,
+    userText: userText.join("\n"),
+    previous,
+    lastAssessment,
+    documentNames,
+    evidenceText: [...userText, ...documentText].join("\n"),
+  };
 }
 
 /** Poslední uložený assessment případu (pro kontrolu verze těsně před zápisem). */
-async function readLatestAssessment(sb: Awaited<ReturnType<typeof loadCaseContext>>["sb"], caseId: string): Promise<Record<string, unknown> | null> {
+async function readLatestAssessment(
+  sb: Awaited<ReturnType<typeof loadCaseContext>>["sb"],
+  caseId: string,
+): Promise<Record<string, unknown> | null> {
   const s = SCHEMA.steps.columns;
   const { DomeError } = await import("./dome.server");
-  const r = await sb.from(SCHEMA.steps.table).select(s.assessment).eq(s.caseId, caseId).eq(s.kind, "dome_assessment")
-    .order(s.createdAt, { ascending: false }).limit(1).maybeSingle();
+  const r = await sb
+    .from(SCHEMA.steps.table)
+    .select(s.assessment)
+    .eq(s.caseId, caseId)
+    .eq(s.kind, "dome_assessment")
+    .order(s.createdAt, { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (r.error) throw new DomeError(`Stav případu nelze ověřit: ${r.error.message}`);
-  return ((r.data as Record<string, unknown> | null)?.[s.assessment] as Record<string, unknown> | null) ?? null;
+  return (
+    ((r.data as Record<string, unknown> | null)?.[s.assessment] as Record<
+      string,
+      unknown
+    > | null) ?? null
+  );
 }
 const stateVersion = (a: Record<string, unknown> | null) => {
-  const v = (a?.["case_state"] as { metadata?: { version?: number } } | undefined)?.metadata?.version;
+  const v = (a?.["case_state"] as { metadata?: { version?: number } } | undefined)?.metadata
+    ?.version;
   return typeof v === "number" ? v : 0;
-}
+};
 
 /** Vyhodnotí celý případ a uloží nový dome_assessment přes RPC urad_record_dome_assessment. */
 export const assessCase = createServerFn({ method: "POST" })
@@ -93,11 +129,27 @@ export const assessCase = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result<DomeAssessment>> => {
     try {
       const { generateAssessment, recordAssessment } = await import("./dome.server");
-      const { sb, context, choices, userText, previous, lastAssessment, documents, documentNames, evidenceText } = await loadCaseContext(data.caseId, data.accessToken);
+      const {
+        sb,
+        context,
+        choices,
+        userText,
+        previous,
+        lastAssessment,
+        documents,
+        documentNames,
+        evidenceText,
+      } = await loadCaseContext(data.caseId, data.accessToken);
       // AI selhání vyhodí chybu → nic se neuloží (žádný částečný ani falešný výsledek).
-      const assessment = await generateAssessment(`${context}\n\nVyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.`, "urad", choices, { caseId: data.caseId, userText, previous });
+      const assessment = await generateAssessment(
+        `${context}\n\nVyhodnoť celý případ znovu a vrať aktuální strukturovaný stav.`,
+        "urad",
+        choices,
+        { caseId: data.caseId, userText, previous },
+      );
       // CASE CORE: canonical stav → validace → uložit jen platný stav.
-      const { buildCaseState, normalizeCaseState, validateCaseState } = await import("./case-state");
+      const { buildCaseState, normalizeCaseState, validateCaseState } =
+        await import("./case-state");
       const { DomeError } = await import("./dome.server");
       // Během AI běhu mohl uživatel změnit akce → stavíme vždy nad nejnovějším uloženým stavem (jeho volby se nepřepíšou).
       const latestBeforeBuild = await readLatestAssessment(sb, data.caseId);
@@ -107,14 +159,26 @@ export const assessCase = createServerFn({ method: "POST" })
         userGoal: (assessment["user_goal"] as { text?: string } | undefined)?.text ?? null,
         interpretation: (assessment["hypothesis"] as { text?: string } | undefined)?.text ?? null,
         draft: assessment["case_draft"] as never,
-        userText, documents, documentNames, evidenceText,
-        previous: prevState && !prevState.metadata.legacy_normalized ? prevState : prevState ? { ...prevState, actions: [] } : null,
+        userText,
+        documents,
+        documentNames,
+        evidenceText,
+        previous:
+          prevState && !prevState.metadata.legacy_normalized
+            ? prevState
+            : prevState
+              ? { ...prevState, actions: [] }
+              : null,
       });
       // Verze = poslední uložená verze (počáteční stav / legacy = 0); nová = +1. Atomicky ověří DB.
       const expectedVersion = stateVersion(latestBeforeBuild);
       caseState.metadata.version = expectedVersion + 1;
       const errs = validateCaseState(caseState);
-      if (errs.length) throw new DomeError(`Vyhodnocení nemá platnou strukturu, nic se neuložilo. (${errs.slice(0, 3).join("; ")})`, 502);
+      if (errs.length)
+        throw new DomeError(
+          `Vyhodnocení nemá platnou strukturu, nic se neuložilo. (${errs.slice(0, 3).join("; ")})`,
+          502,
+        );
       delete assessment["case_draft"];
       assessment["case_state"] = caseState;
       await recordAssessment(sb, data.caseId, assessment, expectedVersion);
@@ -133,7 +197,11 @@ export const prepareHandoff = createServerFn({ method: "POST" })
       const { context, documents } = await loadCaseContext(data.caseId, data.accessToken);
       const h = await generateHandoff(context);
       const items = enforceHandoffLabels(
-        (h.items ?? []).map((it) => ({ section: String(it.section ?? ""), label: it.label, text: String(it.text ?? "") })),
+        (h.items ?? []).map((it) => ({
+          section: String(it.section ?? ""),
+          label: it.label,
+          text: String(it.text ?? ""),
+        })),
         documents,
       ) as HandoffItem[];
       return { ok: true, data: items };
@@ -153,7 +221,10 @@ export const analyzeDocument = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         fileName: z.string().min(1).max(200),
         mimeType: z.string().regex(/^(image\/(png|jpeg|webp)|application\/pdf)$/),
-        base64: z.string().min(1).max(Math.ceil((MAX_BYTES * 4) / 3) + 8),
+        base64: z
+          .string()
+          .min(1)
+          .max(Math.ceil((MAX_BYTES * 4) / 3) + 8),
       })
       .parse(d),
   )
@@ -161,7 +232,11 @@ export const analyzeDocument = createServerFn({ method: "POST" })
     try {
       const { verifyUser, callAi, DomeError } = await import("./dome.server");
       const { sb } = await verifyUser(data.accessToken);
-      const own = await sb.from(SCHEMA.cases.table).select(SCHEMA.cases.columns.id).eq(SCHEMA.cases.columns.id, data.caseId).maybeSingle();
+      const own = await sb
+        .from(SCHEMA.cases.table)
+        .select(SCHEMA.cases.columns.id)
+        .eq(SCHEMA.cases.columns.id, data.caseId)
+        .maybeSingle();
       if (own.error || !own.data) throw new DomeError("Případ nebyl nalezen.", 404);
 
       const url = `data:${data.mimeType};base64,${data.base64}`;
@@ -188,7 +263,10 @@ export const analyzeDocument = createServerFn({ method: "POST" })
         [s.documentName]: data.fileName,
         [s.content]: summary.trim(),
       });
-      if (ins.error) throw new DomeError(`Dokument se nepodařilo zapsat: ${ins.error.message} (kód: ${ins.error.code ?? "?"})`);
+      if (ins.error)
+        throw new DomeError(
+          `Dokument se nepodařilo zapsat: ${ins.error.message} (kód: ${ins.error.code ?? "?"})`,
+        );
       return { ok: true, data: { summary } };
     } catch (e) {
       return fail(e);
@@ -212,16 +290,28 @@ export const updateActionStatus = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result<{ version: number }>> => {
     try {
       const { recordAssessment, DomeError } = await import("./dome.server");
-      const { applyActionStatus, normalizeCaseState, validateCaseState } = await import("./case-state");
+      const { applyActionStatus, normalizeCaseState, validateCaseState } =
+        await import("./case-state");
       const { sb, lastAssessment } = await loadCaseContext(data.caseId, data.accessToken);
       const current = normalizeCaseState(lastAssessment, data.caseId);
-      if (!lastAssessment || !current || current.metadata.legacy_normalized) throw new DomeError("Případ zatím nemá akční plán.", 409);
-      if (current.metadata.version !== data.expectedVersion) throw new DomeError("Stav případu se mezitím změnil. Obnovte stránku.", 409);
+      if (!lastAssessment || !current || current.metadata.legacy_normalized)
+        throw new DomeError("Případ zatím nemá akční plán.", 409);
+      if (current.metadata.version !== data.expectedVersion)
+        throw new DomeError("Stav případu se mezitím změnil. Obnovte stránku.", 409);
       const next = applyActionStatus(current, data.actionId, data.status, data.reason);
       const errs = validateCaseState(next);
       if (errs.length) throw new DomeError(`Změnu nelze uložit: ${errs[0]}`, 422);
       const act = next.actions.find((a) => a.id === data.actionId)!;
-      await recordAssessment(sb, data.caseId, { ...(lastAssessment as Record<string, unknown>), case_state: next, change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}` }, current.metadata.version);
+      await recordAssessment(
+        sb,
+        data.caseId,
+        {
+          ...(lastAssessment as Record<string, unknown>),
+          case_state: next,
+          change_note: `Akce „${act.title}“: ${data.status}${act.status_reason ? ` — ${act.status_reason}` : ""}`,
+        },
+        current.metadata.version,
+      );
       return { ok: true, data: { version: next.metadata.version } };
     } catch (e) {
       return fail(e);

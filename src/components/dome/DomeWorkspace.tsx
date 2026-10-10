@@ -4,7 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { Sparkles, FileText, User, Paperclip, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { addUserInput, getAccessToken, listSteps, type CaseStep, type DomeAssessment, type UradCase } from "@/lib/urad-api";
+import {
+  addUserInput,
+  getAccessToken,
+  listSteps,
+  type CaseStep,
+  type DomeAssessment,
+  type UradCase,
+} from "@/lib/urad-api";
 import { analyzeDocument, assessCase } from "@/lib/dome.functions";
 import { deriveHandoffState, formatChoice, parseChoice, type ChoiceId } from "@/lib/dome-core";
 import { SupportPathCard } from "./SupportPath";
@@ -45,7 +52,10 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
   // Stejné odvození jako na serveru — volba uživatele se projeví okamžitě, i u starších hodnocení.
   const handoffState = latest
     ? deriveHandoffState({
-        choices: list.filter((x) => x.kind === "user_input").map((x) => parseChoice(x.content)).filter((x): x is ChoiceId => !!x),
+        choices: list
+          .filter((x) => x.kind === "user_input")
+          .map((x) => parseChoice(x.content))
+          .filter((x): x is ChoiceId => !!x),
         gapDetected: !!latest.immediate_need_gap?.detected,
         level: level ?? "SELF",
         targetVerified: false,
@@ -101,13 +111,16 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
   async function onFile(file: File | undefined) {
     if (!file) return;
     if (file.size > MAX_BYTES) return setError("Soubor je větší než 8 MB.");
-    if (!ACCEPT.split(",").includes(file.type)) return setError("Podporované jsou fotky (JPG, PNG, WEBP) a PDF.");
+    if (!ACCEPT.split(",").includes(file.type))
+      return setError("Podporované jsou fotky (JPG, PNG, WEBP) a PDF.");
     setBusy("doc");
     setError(null);
     try {
       const accessToken = await getAccessToken();
       const base64 = await toBase64(file);
-      const r = await analyze({ data: { caseId: item.id, accessToken, fileName: file.name, mimeType: file.type, base64 } });
+      const r = await analyze({
+        data: { caseId: item.id, accessToken, fileName: file.name, mimeType: file.type, base64 },
+      });
       if (!r.ok) setError(r.error);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Dokument se nepodařilo zpracovat.");
@@ -122,7 +135,9 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
     <div className="space-y-8">
       {item.description && (
         <div className="rounded-2xl bg-muted p-5">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Váš popis</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Váš popis
+          </p>
           <p className="mt-2 whitespace-pre-wrap leading-relaxed">{item.description}</p>
         </div>
       )}
@@ -144,10 +159,24 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
       {latest && busy !== "assess" && (
         <>
           {!urgent && <GoalPanel a={latest} />}
-          <SupportPathCard caseId={item.id} a={latest} state={handoffState} disabled={!!busy} onChoice={(id) => void sendText(formatChoice(id))} onArea={(t) => void sendText(t)} />
+          <SupportPathCard
+            caseId={item.id}
+            a={latest}
+            state={handoffState}
+            disabled={!!busy}
+            onChoice={(id) => void sendText(formatChoice(id))}
+            onArea={(t) => void sendText(t)}
+          />
           {urgent && <GoalPanel a={latest} />}
           <AssessmentView a={latest} />
-          {caseState && <CaseCorePanel caseId={item.id} state={caseState} disabled={!!busy} onChanged={() => qc.invalidateQueries({ queryKey: ["steps", item.id] })} />}
+          {caseState && (
+            <CaseCorePanel
+              caseId={item.id}
+              state={caseState}
+              disabled={!!busy}
+              onChanged={() => qc.invalidateQueries({ queryKey: ["steps", item.id] })}
+            />
+          )}
         </>
       )}
 
@@ -155,7 +184,12 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
         <div className="rounded-2xl border border-destructive/40 p-4 text-sm text-destructive">
           {error}
           {needsAssessment && !busy && (
-            <Button variant="outline" size="sm" className="ml-3" onClick={() => void runAssessment()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="ml-3"
+              onClick={() => void runAssessment()}
+            >
               Zkusit znovu
             </Button>
           )}
@@ -173,12 +207,24 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <input ref={fileRef} type="file" accept={ACCEPT} className="hidden" onChange={(e) => void onFile(e.target.files?.[0])} />
+              <input
+                ref={fileRef}
+                type="file"
+                accept={ACCEPT}
+                className="hidden"
+                onChange={(e) => void onFile(e.target.files?.[0])}
+              />
               <Button variant="outline" disabled={!!busy} onClick={() => fileRef.current?.click()}>
-                {busy === "doc" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+                {busy === "doc" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Paperclip className="h-4 w-4" />
+                )}
                 Přidat dokument
               </Button>
-              <p className="hidden text-xs text-muted-foreground sm:block">Soubor se jen přečte, neukládá se.</p>
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                Soubor se jen přečte, neukládá se.
+              </p>
             </div>
             <Button disabled={!!busy || !answer.trim()} onClick={() => void send()}>
               {busy === "send" && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -197,10 +243,15 @@ function Section({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </p>
       <ul className="mt-2 space-y-1 text-sm">
         {items.map((t, i) => (
-          <li key={i} className="flex gap-2"><span className="text-muted-foreground">•</span><span>{t}</span></li>
+          <li key={i} className="flex gap-2">
+            <span className="text-muted-foreground">•</span>
+            <span>{t}</span>
+          </li>
         ))}
       </ul>
     </div>
@@ -211,11 +262,17 @@ function GoalPanel({ a }: { a: DomeAssessment }) {
   if (!a.user_goal?.text) return null;
   return (
     <div className="rounded-2xl border border-border p-5" data-testid="user-goal">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Váš cíl</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Váš cíl
+      </p>
       <p className="mt-1 font-medium">{a.user_goal.text}</p>
       {a.user_message && <p className="mt-2 text-sm leading-relaxed">{a.user_message}</p>}
       {(a.then_actions?.length ?? 0) > 0 && (
-        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">{a.then_actions!.map((t, i) => <li key={i}>• {t}</li>)}</ul>
+        <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+          {a.then_actions!.map((t, i) => (
+            <li key={i}>• {t}</li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -238,32 +295,51 @@ function AssessmentView({ a }: { a: DomeAssessment }) {
       )}
 
       <div className="rounded-2xl bg-primary p-6 text-primary-foreground">
-        <p className="text-xs font-semibold uppercase tracking-wider opacity-80">Nejdůležitější otázka</p>
-        <p className="mt-2 font-display text-xl font-semibold leading-snug">{a.current_question?.text}</p>
-        {a.current_question?.reason && <p className="mt-3 text-sm opacity-85">{a.current_question.reason}</p>}
+        <p className="text-xs font-semibold uppercase tracking-wider opacity-80">
+          Nejdůležitější otázka
+        </p>
+        <p className="mt-2 font-display text-xl font-semibold leading-snug">
+          {a.current_question?.text}
+        </p>
+        {a.current_question?.reason && (
+          <p className="mt-3 text-sm opacity-85">{a.current_question.reason}</p>
+        )}
       </div>
 
       <details className="rounded-2xl border border-border p-6">
         <summary className="cursor-pointer text-sm font-medium">Podrobnosti a dokumenty</summary>
         <div className="mt-4">
           <div className="flex items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Jak to zatím chápu</p>
-            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Neověřeno</span>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Jak to zatím chápu
+            </p>
+            <span className="rounded-full border border-border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Neověřeno
+            </span>
           </div>
           <p className="mt-2 text-sm leading-relaxed">{a.hypothesis?.text}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Jistota: {a.confidence === "medium" ? "střední" : "nízká"} · nejde o právní posouzení</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Jistota: {a.confidence === "medium" ? "střední" : "nízká"} · nejde o právní posouzení
+          </p>
         </div>
         <div className="mt-6 grid gap-6 sm:grid-cols-2">
           <Section title="Co jste uvedl/a" items={a.stated_by_user ?? []} />
           <Section title="Doloženo" items={a.verified ?? []} />
           <Section title="Co může pracovník zjistit s vámi" items={a.to_verify ?? []} />
           <Section title="Co zatím nevím" items={a.missing_information ?? []} />
-          <Section title="Dokumenty, které se mohou hodit (nejsou podmínkou)" items={a.required_documents ?? []} />
+          <Section
+            title="Dokumenty, které se mohou hodit (nejsou podmínkou)"
+            items={a.required_documents ?? []}
+          />
           {a.next_step?.text && (
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Potom</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Potom
+              </p>
               <p className="mt-2 text-sm">{a.next_step.text}</p>
-              {a.next_step.condition && <p className="mt-1 text-xs text-muted-foreground">{a.next_step.condition}</p>}
+              {a.next_step.condition && (
+                <p className="mt-1 text-xs text-muted-foreground">{a.next_step.condition}</p>
+              )}
             </div>
           )}
         </div>
@@ -275,12 +351,23 @@ function AssessmentView({ a }: { a: DomeAssessment }) {
 function Timeline({ steps }: { steps: CaseStep[] }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Průběh případu</p>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Průběh případu
+      </p>
       <ol className="mt-4 space-y-4">
         {steps.map((st) => {
-          const Icon = st.kind === "user_input" ? User : st.kind === "user_document" ? FileText : Sparkles;
-          const label = st.kind === "user_input" ? "Vy" : st.kind === "user_document" ? `Dokument: ${st.documentName ?? ""}` : "DOME";
-          const text = st.kind === "dome_assessment" ? (st.assessment?.change_note ?? st.assessment?.current_question?.text) : st.content?.replace(/^\[VOLBA UŽIVATELE[^\]]*\]\s*/, "");
+          const Icon =
+            st.kind === "user_input" ? User : st.kind === "user_document" ? FileText : Sparkles;
+          const label =
+            st.kind === "user_input"
+              ? "Vy"
+              : st.kind === "user_document"
+                ? `Dokument: ${st.documentName ?? ""}`
+                : "DOME";
+          const text =
+            st.kind === "dome_assessment"
+              ? (st.assessment?.change_note ?? st.assessment?.current_question?.text)
+              : st.content?.replace(/^\[VOLBA UŽIVATELE[^\]]*\]\s*/, "");
           return (
             <li key={st.id} className="flex gap-4">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground">
@@ -290,10 +377,16 @@ function Timeline({ steps }: { steps: CaseStep[] }) {
                 <p className="text-sm font-medium">
                   {label}{" "}
                   <span className="font-normal text-muted-foreground">
-                    · {new Date(st.createdAt).toLocaleString("cs-CZ", { dateStyle: "short", timeStyle: "short" })}
+                    ·{" "}
+                    {new Date(st.createdAt).toLocaleString("cs-CZ", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
                   </span>
                 </p>
-                {text && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{text}</p>}
+                {text && (
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{text}</p>
+                )}
               </div>
             </li>
           );

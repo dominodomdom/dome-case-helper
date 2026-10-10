@@ -5,7 +5,9 @@ import { getCase } from "@/lib/urad-api";
 import { DomeWorkspace } from "@/components/dome/DomeWorkspace";
 
 export const Route = createFileRoute("/_chraneno/pripady/$id")({
-  head: () => ({ meta: [{ title: "Detail případu — DOME OS ÚŘAD" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({
+    meta: [{ title: "Detail případu — DOME OS ÚŘAD" }, { name: "robots", content: "noindex" }],
+  }),
   component: CaseDetail,
 });
 
@@ -14,7 +16,10 @@ function CaseDetail() {
   const q = useQuery({ queryKey: ["case", id], queryFn: () => getCase(id) });
   return (
     <div className="space-y-8">
-      <Link to="/prace" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        to="/prace"
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Moje případy
       </Link>
       {q.isPending && <p className="text-muted-foreground">Načítám…</p>}

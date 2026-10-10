@@ -8,7 +8,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { createCase } from "@/lib/urad-api";
 
 export const Route = createFileRoute("/_chraneno/pripady/novy")({
-  head: () => ({ meta: [{ title: "Nový případ — DOME OS ÚŘAD" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({
+    meta: [{ title: "Nový případ — DOME OS ÚŘAD" }, { name: "robots", content: "noindex" }],
+  }),
   component: NewCase,
 });
 
@@ -35,12 +37,17 @@ function NewCase() {
 
   return (
     <div className="space-y-8">
-      <Link to="/prace" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+      <Link
+        to="/prace"
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
         <ArrowLeft className="h-4 w-4" /> Zpět
       </Link>
       <div>
         <h1 className="font-display text-3xl font-semibold tracking-tight">Popište, co se děje</h1>
-        <p className="mt-2 text-muted-foreground">Vlastními slovy. Nemusíte znát úřední pojmy — zbytek zjistíme spolu.</p>
+        <p className="mt-2 text-muted-foreground">
+          Vlastními slovy. Nemusíte znát úřední pojmy — zbytek zjistíme spolu.
+        </p>
       </div>
       <form onSubmit={submit} className="space-y-5">
         <div className="space-y-2">
@@ -56,10 +63,20 @@ function NewCase() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="t">Krátký název (nepovinné)</Label>
-          <Input id="t" value={title} onChange={(e) => setTitle(e.target.value)} className="h-12" placeholder="Příspěvek na bydlení" />
+          <Input
+            id="t"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="h-12"
+            placeholder="Příspěvek na bydlení"
+          />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" disabled={busy || !description.trim()} className="h-12 w-full text-base sm:w-auto sm:px-8">
+        <Button
+          type="submit"
+          disabled={busy || !description.trim()}
+          className="h-12 w-full text-base sm:w-auto sm:px-8"
+        >
           {busy ? "Zakládám…" : "Pokračovat s DOME"}
         </Button>
       </form>

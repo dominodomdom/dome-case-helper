@@ -4,9 +4,26 @@
  * Doménu dodává jen resolver. Čistý modul bez tajemství — sdílí ho server (prompt, schéma, invarianty) i UI (typy).
  */
 
-import { ACTION_PRIORITIES, DEADLINE_ANCHORS, EVIDENCE_KINDS, ACTION_TYPES, NEED_CATEGORIES, NEED_URGENCIES, REALITY_SOURCES, REALITY_TYPES, TRACK_TYPES, UNKNOWN_IMPACTS } from "./case-state";
+import {
+  ACTION_PRIORITIES,
+  DEADLINE_ANCHORS,
+  EVIDENCE_KINDS,
+  ACTION_TYPES,
+  NEED_CATEGORIES,
+  NEED_URGENCIES,
+  REALITY_SOURCES,
+  REALITY_TYPES,
+  TRACK_TYPES,
+  UNKNOWN_IMPACTS,
+} from "./case-state";
 
-export const INTERVENTION_LEVELS = ["SELF", "OPTIONS", "CONNECT", "ACTIVE_HANDOFF", "SAFETY_HANDOFF"] as const;
+export const INTERVENTION_LEVELS = [
+  "SELF",
+  "OPTIONS",
+  "CONNECT",
+  "ACTIVE_HANDOFF",
+  "SAFETY_HANDOFF",
+] as const;
 export type InterventionLevel = (typeof INTERVENTION_LEVELS)[number];
 export const URGENCY_LEVELS = ["low", "medium", "high", "critical"] as const;
 export type Urgency = (typeof URGENCY_LEVELS)[number];
@@ -67,11 +84,13 @@ export function deriveHandoffState(input: {
     if (c === "CONNECTED") return "HUMAN_CONNECTED";
     if (c === "AT_PLACE" || c === "PHONE_HANDOVER") return "HANDOFF_READY";
     if (c === "GO" || c === "CONNECT") return "USER_EN_ROUTE";
-    if (c === "DECLINE" || c === "SELF") return level === "SAFETY_HANDOFF" ? "IMMEDIATE_NEED_DETECTED" : "HANDOFF_DECLINED";
+    if (c === "DECLINE" || c === "SELF")
+      return level === "SAFETY_HANDOFF" ? "IMMEDIATE_NEED_DETECTED" : "HANDOFF_DECLINED";
   }
   if (routeVerified && targetVerified) return "ROUTE_READY";
   if (targetVerified) return "SUPPORT_TARGET_FOUND";
-  if (gapDetected || level === "ACTIVE_HANDOFF" || level === "SAFETY_HANDOFF") return "IMMEDIATE_NEED_DETECTED";
+  if (gapDetected || level === "ACTIVE_HANDOFF" || level === "SAFETY_HANDOFF")
+    return "IMMEDIATE_NEED_DETECTED";
   return "NONE";
 }
 
@@ -79,10 +98,13 @@ export function deriveHandoffState(input: {
 
 const DOMAIN_RESOLVERS: Record<DomainId, string> = {
   urad: "Doména ÚŘAD: agenda Úřadu práce ČR — dávky, příspěvky, příspěvek na bydlení, příspěvek/doplatek na živobytí, mimořádná okamžitá pomoc (MOP), odvolání, doplnění řízení. Rozhodnutí o MOP nemusí být okamžité, proto při akutní nouzi nelze na MOP spoléhat jako na řešení dnešní noci. Typy podpory: kontaktní pracoviště ÚP, sociální pracovník obce/městské části, terénní sociální služby, kontaktní centrum, noclehárna, azylový dům, potravinová pomoc, odborné sociální poradenství, dluhová poradna.",
-  finance: "Doména FINANCE: rozpočet, dluhy, exekuce, insolvence. Podpora: dluhové poradny, odborné poradenství.",
-  housing: "Doména HOUSING: bydlení, nájem, ztráta bydlení. Podpora: sociální pracovník, housing support, azylové domy.",
+  finance:
+    "Doména FINANCE: rozpočet, dluhy, exekuce, insolvence. Podpora: dluhové poradny, odborné poradenství.",
+  housing:
+    "Doména HOUSING: bydlení, nájem, ztráta bydlení. Podpora: sociální pracovník, housing support, azylové domy.",
   law: "Doména LAW: právní situace. Podpora: bezplatná právní poradna. Žádné právní závěry.",
-  health: "Doména HEALTH: zdravotní situace. Bez diagnostiky. Podpora: praktický lékař, linky pomoci, záchranná služba.",
+  health:
+    "Doména HEALTH: zdravotní situace. Bez diagnostiky. Podpora: praktický lékař, linky pomoci, záchranná služba.",
   business: "Doména BUSINESS: podnikání. Podpora: živnostenský úřad, poradenská centra.",
   personal: "Doména PERSONAL: osobní rozvoj. Podpora: kariérní a osobní poradenství.",
 };
@@ -149,22 +171,146 @@ const str = { type: "string" } as const;
 const enumOf = (v: readonly string[]) => ({ type: "string", enum: [...v] }) as const;
 const nullableStrS = { type: ["string", "null"] } as const;
 const CASE_DRAFT_SCHEMA = {
-  type: "object", additionalProperties: false, required: ["reality", "person", "needs", "actions", "unknowns"],
+  type: "object",
+  additionalProperties: false,
+  required: ["reality", "person", "needs", "actions", "unknowns"],
   properties: {
-    reality: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "type", "text", "source", "document_name", "evidence", "need_keys"], properties: {
-      key: str, type: enumOf(REALITY_TYPES), text: str, source: enumOf(REALITY_SOURCES), document_name: nullableStrS,
-      evidence: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["kind", "ref"], properties: { kind: enumOf(EVIDENCE_KINDS), ref: str } }] }, need_keys: { type: "array", items: str } } } },
-    person: { type: "object", additionalProperties: false, required: ["current_status", "employment_status", "education_status", "housing_status", "income_status", "available_resources", "relevant_social_context", "relevant_procedures", "relevant_documents"], properties: {
-      current_status: nullableStrS, employment_status: nullableStrS, education_status: nullableStrS, housing_status: nullableStrS, income_status: nullableStrS,
-      available_resources: { type: "array", items: str }, relevant_social_context: { type: "array", items: str }, relevant_procedures: { type: "array", items: str }, relevant_documents: { type: "array", items: str } } },
-    needs: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "category", "description", "amount", "amount_mention", "urgency", "deadline", "deadline_mention", "deadline_anchor", "tracks"], properties: {
-      key: str, category: enumOf(NEED_CATEGORIES), description: str, amount: { type: ["number", "null"] }, amount_mention: nullableStrS,
-      urgency: enumOf(NEED_URGENCIES), deadline: nullableStrS, deadline_mention: nullableStrS,
-      deadline_anchor: { anyOf: [{ type: "null" }, { type: "object", additionalProperties: false, required: ["type", "key"], properties: { type: enumOf(DEADLINE_ANCHORS), key: str } }] }, tracks: { type: "array", items: enumOf(TRACK_TYPES) } } } },
-    actions: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "title", "description", "type", "priority", "track", "need_keys", "depends_on"], properties: {
-      key: str, title: str, description: str, type: enumOf(ACTION_TYPES), priority: enumOf(ACTION_PRIORITIES), track: { type: ["string", "null"], enum: [...TRACK_TYPES, null] }, need_keys: { type: "array", items: str }, depends_on: { type: "array", items: str } } } },
-    unknowns: { type: "array", items: { type: "object", additionalProperties: false, required: ["key", "question", "why_it_matters", "need_keys", "impact"], properties: {
-      key: str, question: str, why_it_matters: str, need_keys: { type: "array", items: str }, impact: enumOf(UNKNOWN_IMPACTS) } } },
+    reality: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["key", "type", "text", "source", "document_name", "evidence", "need_keys"],
+        properties: {
+          key: str,
+          type: enumOf(REALITY_TYPES),
+          text: str,
+          source: enumOf(REALITY_SOURCES),
+          document_name: nullableStrS,
+          evidence: {
+            anyOf: [
+              { type: "null" },
+              {
+                type: "object",
+                additionalProperties: false,
+                required: ["kind", "ref"],
+                properties: { kind: enumOf(EVIDENCE_KINDS), ref: str },
+              },
+            ],
+          },
+          need_keys: { type: "array", items: str },
+        },
+      },
+    },
+    person: {
+      type: "object",
+      additionalProperties: false,
+      required: [
+        "current_status",
+        "employment_status",
+        "education_status",
+        "housing_status",
+        "income_status",
+        "available_resources",
+        "relevant_social_context",
+        "relevant_procedures",
+        "relevant_documents",
+      ],
+      properties: {
+        current_status: nullableStrS,
+        employment_status: nullableStrS,
+        education_status: nullableStrS,
+        housing_status: nullableStrS,
+        income_status: nullableStrS,
+        available_resources: { type: "array", items: str },
+        relevant_social_context: { type: "array", items: str },
+        relevant_procedures: { type: "array", items: str },
+        relevant_documents: { type: "array", items: str },
+      },
+    },
+    needs: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "key",
+          "category",
+          "description",
+          "amount",
+          "amount_mention",
+          "urgency",
+          "deadline",
+          "deadline_mention",
+          "deadline_anchor",
+          "tracks",
+        ],
+        properties: {
+          key: str,
+          category: enumOf(NEED_CATEGORIES),
+          description: str,
+          amount: { type: ["number", "null"] },
+          amount_mention: nullableStrS,
+          urgency: enumOf(NEED_URGENCIES),
+          deadline: nullableStrS,
+          deadline_mention: nullableStrS,
+          deadline_anchor: {
+            anyOf: [
+              { type: "null" },
+              {
+                type: "object",
+                additionalProperties: false,
+                required: ["type", "key"],
+                properties: { type: enumOf(DEADLINE_ANCHORS), key: str },
+              },
+            ],
+          },
+          tracks: { type: "array", items: enumOf(TRACK_TYPES) },
+        },
+      },
+    },
+    actions: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "key",
+          "title",
+          "description",
+          "type",
+          "priority",
+          "track",
+          "need_keys",
+          "depends_on",
+        ],
+        properties: {
+          key: str,
+          title: str,
+          description: str,
+          type: enumOf(ACTION_TYPES),
+          priority: enumOf(ACTION_PRIORITIES),
+          track: { type: ["string", "null"], enum: [...TRACK_TYPES, null] },
+          need_keys: { type: "array", items: str },
+          depends_on: { type: "array", items: str },
+        },
+      },
+    },
+    unknowns: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["key", "question", "why_it_matters", "need_keys", "impact"],
+        properties: {
+          key: str,
+          question: str,
+          why_it_matters: str,
+          need_keys: { type: "array", items: str },
+          impact: enumOf(UNKNOWN_IMPACTS),
+        },
+      },
+    },
   },
 } as const;
 const strArr = { type: "array", items: str } as const;
@@ -174,14 +320,34 @@ export const ASSESSMENT_SCHEMA = {
   type: "object",
   additionalProperties: false,
   required: [
-    "user_goal", "user_message", "situation", "urgency", "intervention_level", "immediate_need_gap",
-    "now_actions", "then_actions", "hypothesis", "stated_by_user", "verified", "to_verify",
-    "missing_information", "required_documents", "current_question", "next_step", "primary_next_action",
-    "say_to_worker", "support_path", "handoff_state_suggestion", "confidence", "case_draft",
+    "user_goal",
+    "user_message",
+    "situation",
+    "urgency",
+    "intervention_level",
+    "immediate_need_gap",
+    "now_actions",
+    "then_actions",
+    "hypothesis",
+    "stated_by_user",
+    "verified",
+    "to_verify",
+    "missing_information",
+    "required_documents",
+    "current_question",
+    "next_step",
+    "primary_next_action",
+    "say_to_worker",
+    "support_path",
+    "handoff_state_suggestion",
+    "confidence",
+    "case_draft",
   ],
   properties: {
     user_goal: {
-      type: "object", additionalProperties: false, required: ["text", "source"],
+      type: "object",
+      additionalProperties: false,
+      required: ["text", "source"],
       properties: { text: str, source: { type: "string", enum: ["user_stated"] } },
     },
     user_message: str,
@@ -189,13 +355,17 @@ export const ASSESSMENT_SCHEMA = {
     urgency: { type: "string", enum: [...URGENCY_LEVELS] },
     intervention_level: { type: "string", enum: [...INTERVENTION_LEVELS] },
     immediate_need_gap: {
-      type: "object", additionalProperties: false, required: ["detected", "needs", "reason"],
+      type: "object",
+      additionalProperties: false,
+      required: ["detected", "needs", "reason"],
       properties: { detected: { type: "boolean" }, needs: strArr, reason: str },
     },
     now_actions: strArr,
     then_actions: strArr,
     hypothesis: {
-      type: "object", additionalProperties: false, required: ["text", "status"],
+      type: "object",
+      additionalProperties: false,
+      required: ["text", "status"],
       properties: { text: str, status: { type: "string", enum: ["unverified"] } },
     },
     stated_by_user: strArr,
@@ -204,21 +374,36 @@ export const ASSESSMENT_SCHEMA = {
     missing_information: strArr,
     required_documents: strArr,
     current_question: {
-      type: "object", additionalProperties: false, required: ["text", "reason"],
+      type: "object",
+      additionalProperties: false,
+      required: ["text", "reason"],
       properties: { text: str, reason: str },
     },
     next_step: {
-      type: "object", additionalProperties: false, required: ["text", "condition"],
+      type: "object",
+      additionalProperties: false,
+      required: ["text", "condition"],
       properties: { text: str, condition: str },
     },
     primary_next_action: str,
     say_to_worker: str,
     support_path: {
-      type: "object", additionalProperties: false,
+      type: "object",
+      additionalProperties: false,
       required: [
-        "relevance", "intervention_level", "reason", "target_type", "target_name", "target_address",
-        "target_source", "services", "immediate_needs", "required_documents", "next_action",
-        "navigation_available", "handoff_available",
+        "relevance",
+        "intervention_level",
+        "reason",
+        "target_type",
+        "target_name",
+        "target_address",
+        "target_source",
+        "services",
+        "immediate_needs",
+        "required_documents",
+        "next_action",
+        "navigation_available",
+        "handoff_available",
       ],
       properties: {
         relevance: { type: "string", enum: ["none", "optional", "recommended", "urgent"] },
@@ -254,7 +439,12 @@ export function enforceAssessmentInvariants(
     : "SELF";
   a["intervention_level"] = lvl;
 
-  const gap = { detected: false, needs: [] as string[], reason: "", ...((a["immediate_need_gap"] as object) ?? {}) };
+  const gap = {
+    detected: false,
+    needs: [] as string[],
+    reason: "",
+    ...((a["immediate_need_gap"] as object) ?? {}),
+  };
   gap.detected = gap.detected === true;
   a["immediate_need_gap"] = gap;
   a["support_path_required"] = gap.detected || lvl === "ACTIVE_HANDOFF" || lvl === "SAFETY_HANDOFF";
@@ -286,7 +476,13 @@ export function enforceAssessmentInvariants(
 
 /* ---------- Shrnutí pro pracovníka ---------- */
 
-export const HANDOFF_SECTIONS = ["cil", "aktualni_situace", "potrebuje_ted", "dokumenty", "puvodni_cil"] as const;
+export const HANDOFF_SECTIONS = [
+  "cil",
+  "aktualni_situace",
+  "potrebuje_ted",
+  "dokumenty",
+  "puvodni_cil",
+] as const;
 
 export const HANDOFF_SYSTEM = `Připrav stručné "Shrnutí pro pracovníka" (sociální pracovník / úředník). Uživatel ho pracovníkovi sám ukáže. Česky, věcně, ve 3. osobě ("uživatel uvedl, že…").
 Sekce (section):
@@ -309,7 +505,9 @@ export const HANDOFF_SCHEMA = {
     items: {
       type: "array",
       items: {
-        type: "object", additionalProperties: false, required: ["section", "label", "text"],
+        type: "object",
+        additionalProperties: false,
+        required: ["section", "label", "text"],
         properties: {
           section: { type: "string", enum: [...HANDOFF_SECTIONS] },
           label: { type: "string", enum: ["FACT", "USER_REPORTED", "UNVERIFIED"] },
@@ -321,7 +519,10 @@ export const HANDOFF_SCHEMA = {
 } as const;
 
 /** FACT bez nahraného dokumentu neexistuje. */
-export function enforceHandoffLabels<T extends { label?: string | undefined }>(items: T[], documents: number): T[] {
+export function enforceHandoffLabels<T extends { label?: string | undefined }>(
+  items: T[],
+  documents: number,
+): T[] {
   return items.map((it) => ({
     ...it,
     label: it.label === "FACT" && documents === 0 ? "UNVERIFIED" : (it.label ?? "UNVERIFIED"),
