@@ -15,7 +15,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-5">
           <Brand />
-          <button onClick={signOut} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <button
+            onClick={signOut}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
             <LogOut className="h-4 w-4" /> Odhlásit
           </button>
         </div>

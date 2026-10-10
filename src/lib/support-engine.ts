@@ -10,9 +10,11 @@ import type { ChoiceId, HandoffState, InterventionLevel } from "./dome-core";
 /* ---------- 1. Need Detection (kombinace signálů, ne jedno slovo) ---------- */
 
 export const NEED_SIGNALS = {
-  no_money: /\b0\s*(kč|korun)|nemám\s+(žádné\s+)?peníze|bez\s+peněz|nemám\s+ani\s+korunu|nula\s+korun/i,
+  no_money:
+    /\b0\s*(kč|korun)|nemám\s+(žádné\s+)?peníze|bez\s+peněz|nemám\s+ani\s+korunu|nula\s+korun/i,
   no_food: /nemám\s+(co\s+)?(jíst|jídlo|na\s+jídlo)|hlad/i,
-  no_shelter_tonight: /(nemám|není)\s+kde\s+(dnes\s+|dneska\s+)?(spát|přespat|být)|na\s+ulici|bez\s+střechy|dnešní\s+noc/i,
+  no_shelter_tonight:
+    /(nemám|není)\s+kde\s+(dnes\s+|dneska\s+)?(spát|přespat|být)|na\s+ulici|bez\s+střechy|dnešní\s+noc/i,
   housing_loss_risk: /výpověď\s+z\s+nájmu|vystěhov|přijdu\s+o\s+byt|ztrát\w*\s+bydlen/i,
   alone: /jsem\s+sám|jsem\s+sama|nemám\s+nikoho/i,
   no_transport_money: /nemám\s+na\s+(jízdenku|dopravu|tramvaj|autobus)/i,
@@ -25,29 +27,57 @@ export const NEED_SIGNALS = {
 } as const;
 export type NeedSignal = keyof typeof NEED_SIGNALS;
 
-export type NeedProfile = "NONE" | "ADMINISTRATIVE_SUPPORT" | "OPTIONS_SUPPORT" | "HIGH_IMMEDIATE_SUPPORT" | "SAFETY";
+export type NeedProfile =
+  "NONE" | "ADMINISTRATIVE_SUPPORT" | "OPTIONS_SUPPORT" | "HIGH_IMMEDIATE_SUPPORT" | "SAFETY";
 
-export function detectImmediateNeeds(userText: string): { signals: NeedSignal[]; profile: NeedProfile; floor: InterventionLevel } {
-  const signals = (Object.keys(NEED_SIGNALS) as NeedSignal[]).filter((k) => NEED_SIGNALS[k].test(userText));
+export function detectImmediateNeeds(userText: string): {
+  signals: NeedSignal[];
+  profile: NeedProfile;
+  floor: InterventionLevel;
+} {
+  const signals = (Object.keys(NEED_SIGNALS) as NeedSignal[]).filter((k) =>
+    NEED_SIGNALS[k].test(userText),
+  );
   const has = (s: NeedSignal) => signals.includes(s);
   if (has("safety")) return { signals, profile: "SAFETY", floor: "SAFETY_HANDOFF" };
-  const existential = [has("no_money"), has("no_food"), has("no_shelter_tonight")].filter(Boolean).length;
+  const existential = [has("no_money"), has("no_food"), has("no_shelter_tonight")].filter(
+    Boolean,
+  ).length;
   if ((has("no_shelter_tonight") && (has("no_money") || has("no_food"))) || existential >= 2)
     return { signals, profile: "HIGH_IMMEDIATE_SUPPORT", floor: "ACTIVE_HANDOFF" };
-  if ((has("debts") && (has("no_money") || has("housing_loss_risk"))) || has("housing_loss_risk") || (has("admin_deadline") && signals.length >= 3))
+  if (
+    (has("debts") && (has("no_money") || has("housing_loss_risk"))) ||
+    has("housing_loss_risk") ||
+    (has("admin_deadline") && signals.length >= 3)
+  )
     return { signals, profile: "OPTIONS_SUPPORT", floor: "OPTIONS" };
-  if (has("mop") || has("admin_deadline")) return { signals, profile: "ADMINISTRATIVE_SUPPORT", floor: "SELF" };
+  if (has("mop") || has("admin_deadline"))
+    return { signals, profile: "ADMINISTRATIVE_SUPPORT", floor: "SELF" };
   return { signals, profile: "NONE", floor: "SELF" };
 }
 
-const RANK: InterventionLevel[] = ["SELF", "OPTIONS", "CONNECT", "ACTIVE_HANDOFF", "SAFETY_HANDOFF"];
-export const maxLevel = (a: InterventionLevel, b: InterventionLevel) => (RANK.indexOf(a) >= RANK.indexOf(b) ? a : b);
+const RANK: InterventionLevel[] = [
+  "SELF",
+  "OPTIONS",
+  "CONNECT",
+  "ACTIVE_HANDOFF",
+  "SAFETY_HANDOFF",
+];
+export const maxLevel = (a: InterventionLevel, b: InterventionLevel) =>
+  RANK.indexOf(a) >= RANK.indexOf(b) ? a : b;
 
 /* ---------- 3. Service Registry + Matching ---------- */
 
 export const SERVICE_TYPES = [
-  "DAY_CENTER", "NIGHT_SHELTER", "SOCIAL_SERVICE", "FOOD_SUPPORT", "HOUSING_SUPPORT",
-  "DEBT_COUNSELLING", "BENEFITS_SUPPORT", "MUNICIPAL_SOCIAL_WORK", "CRISIS_SERVICE",
+  "DAY_CENTER",
+  "NIGHT_SHELTER",
+  "SOCIAL_SERVICE",
+  "FOOD_SUPPORT",
+  "HOUSING_SUPPORT",
+  "DEBT_COUNSELLING",
+  "BENEFITS_SUPPORT",
+  "MUNICIPAL_SOCIAL_WORK",
+  "CRISIS_SERVICE",
 ] as const;
 export type ServiceType = (typeof SERVICE_TYPES)[number];
 
@@ -94,7 +124,14 @@ export function scoreService(s: SupportService, needs: NeedSignal[]): number {
   if (need("no_food") && s.food_support) score += 20;
   if (s.open_now) score += 30;
   if (s.accepts_walk_in) score += 20;
-  const multi = [s.social_worker, s.food_support, s.overnight_support, s.housing_support, s.benefits_support, s.debt_support].filter(Boolean).length;
+  const multi = [
+    s.social_worker,
+    s.food_support,
+    s.overnight_support,
+    s.housing_support,
+    s.benefits_support,
+    s.debt_support,
+  ].filter(Boolean).length;
   score += multi * 8; // gateway service: jeden pracovník, víc navazujících cest
   if (s.social_worker) score += 15;
   if (need("no_money") && s.free_of_charge) score += 10;
@@ -113,8 +150,21 @@ export function matchServices(list: SupportService[], needs: NeedSignal[]): Supp
 
 /* ---------- 5. Transport ---------- */
 
-export type TransportLeg = { mode: "WALK" | "TRAM" | "BUS" | "METRO" | "TRAIN"; line: string | null; direction: string | null; from: string; to: string; minutes: number | null };
-export type TransportPlan = { legs: TransportLeg[]; total_minutes: number | null; disruptions: string[]; source: string; verified_at: string };
+export type TransportLeg = {
+  mode: "WALK" | "TRAM" | "BUS" | "METRO" | "TRAIN";
+  line: string | null;
+  direction: string | null;
+  from: string;
+  to: string;
+  minutes: number | null;
+};
+export type TransportPlan = {
+  legs: TransportLeg[];
+  total_minutes: number | null;
+  disruptions: string[];
+  source: string;
+  verified_at: string;
+};
 
 export interface TransportProvider {
   readonly name: string;
@@ -125,28 +175,67 @@ export const NO_TRANSPORT: TransportProvider = { name: "none", route: async () =
 
 /* ---------- Stavy ---------- */
 
-export type ImmediateNeedStatus = "NONE" | "DETECTED" | "SUPPORT_IDENTIFIED" | "HANDOFF_OFFERED" | "HANDOFF_ACCEPTED" | "EN_ROUTE" | "ARRIVED" | "CONNECTED" | "RESOLVING" | "DECLINED" | "UNKNOWN";
-export type SupportTargetStatus = "UNVERIFIED" | "VERIFIED" | "CURRENTLY_OPEN" | "CURRENTLY_CLOSED" | "UNKNOWN";
-export type TransportStatus = "NOT_NEEDED" | "NEEDED" | "AVAILABLE" | "UNVERIFIED" | "IN_PROGRESS" | "ARRIVED";
+export type ImmediateNeedStatus =
+  | "NONE"
+  | "DETECTED"
+  | "SUPPORT_IDENTIFIED"
+  | "HANDOFF_OFFERED"
+  | "HANDOFF_ACCEPTED"
+  | "EN_ROUTE"
+  | "ARRIVED"
+  | "CONNECTED"
+  | "RESOLVING"
+  | "DECLINED"
+  | "UNKNOWN";
+export type SupportTargetStatus =
+  "UNVERIFIED" | "VERIFIED" | "CURRENTLY_OPEN" | "CURRENTLY_CLOSED" | "UNKNOWN";
+export type TransportStatus =
+  "NOT_NEEDED" | "NEEDED" | "AVAILABLE" | "UNVERIFIED" | "IN_PROGRESS" | "ARRIVED";
 
-export function immediateNeedStatus(state: HandoffState, offered: boolean, target: SupportService | null): ImmediateNeedStatus {
+export function immediateNeedStatus(
+  state: HandoffState,
+  offered: boolean,
+  target: SupportService | null,
+): ImmediateNeedStatus {
   switch (state) {
-    case "HANDOFF_DECLINED": return "DECLINED";
-    case "USER_EN_ROUTE": return "EN_ROUTE";
-    case "HANDOFF_READY": return "ARRIVED";
-    case "HUMAN_CONNECTED": return "CONNECTED";
-    case "HANDOFF_COMPLETED": return "RESOLVING";
-    case "NONE": return "NONE";
-    default: return target ? (offered ? "HANDOFF_OFFERED" : "SUPPORT_IDENTIFIED") : offered ? "HANDOFF_OFFERED" : "DETECTED";
+    case "HANDOFF_DECLINED":
+      return "DECLINED";
+    case "USER_EN_ROUTE":
+      return "EN_ROUTE";
+    case "HANDOFF_READY":
+      return "ARRIVED";
+    case "HUMAN_CONNECTED":
+      return "CONNECTED";
+    case "HANDOFF_COMPLETED":
+      return "RESOLVING";
+    case "NONE":
+      return "NONE";
+    default:
+      return target
+        ? offered
+          ? "HANDOFF_OFFERED"
+          : "SUPPORT_IDENTIFIED"
+        : offered
+          ? "HANDOFF_OFFERED"
+          : "DETECTED";
   }
 }
 export function supportTargetStatus(t: SupportService | null): SupportTargetStatus {
   if (!t) return "UNKNOWN";
   if (t.status !== "VERIFIED") return "UNVERIFIED";
-  return t.open_now === true ? "CURRENTLY_OPEN" : t.open_now === false ? "CURRENTLY_CLOSED" : "VERIFIED";
+  return t.open_now === true
+    ? "CURRENTLY_OPEN"
+    : t.open_now === false
+      ? "CURRENTLY_CLOSED"
+      : "VERIFIED";
 }
-export function transportStatus(state: HandoffState, needed: boolean, plan: TransportPlan | null): TransportStatus {
-  if (state === "HANDOFF_READY" || state === "HUMAN_CONNECTED" || state === "HANDOFF_COMPLETED") return "ARRIVED";
+export function transportStatus(
+  state: HandoffState,
+  needed: boolean,
+  plan: TransportPlan | null,
+): TransportStatus {
+  if (state === "HANDOFF_READY" || state === "HUMAN_CONNECTED" || state === "HANDOFF_COMPLETED")
+    return "ARRIVED";
   if (state === "USER_EN_ROUTE") return plan ? "IN_PROGRESS" : "UNVERIFIED";
   if (!needed) return "NOT_NEEDED";
   return plan ? "AVAILABLE" : "NEEDED";
@@ -191,7 +280,12 @@ export async function applySupportEngine(
     registry?: SupportServiceRegistry;
     transport?: TransportProvider;
     now?: Date;
-    derive: (lvl: InterventionLevel, gap: boolean, targetVerified: boolean, routeVerified: boolean) => HandoffState;
+    derive: (
+      lvl: InterventionLevel,
+      gap: boolean,
+      targetVerified: boolean,
+      routeVerified: boolean,
+    ) => HandoffState;
   },
 ): Promise<Record<string, unknown>> {
   const registry = ctx.registry ?? NO_REGISTRY;
@@ -210,13 +304,18 @@ export async function applySupportEngine(
 
   const sp = a["support_path"] as Record<string, unknown>;
   sp["intervention_level"] = lvl;
-  if (lvl !== "SELF" && sp["relevance"] === "none") sp["relevance"] = lvl === "ACTIVE_HANDOFF" ? "urgent" : "recommended";
+  if (lvl !== "SELF" && sp["relevance"] === "none")
+    sp["relevance"] = lvl === "ACTIVE_HANDOFF" ? "urgent" : "recommended";
 
   // 3. Matching jen z ověřeného registru
-  const matches = matchServices(await registry.search({ area: ctx.area ?? null, needs: det.signals }), det.signals);
+  const matches = matchServices(
+    await registry.search({ area: ctx.area ?? null, needs: det.signals }),
+    det.signals,
+  );
   const target = matches[0] ?? null;
   let plan: TransportPlan | null = null;
-  if (target && ctx.area) plan = await transport.route({ from: ctx.area, toAddress: target.address });
+  if (target && ctx.area)
+    plan = await transport.route({ from: ctx.area, toAddress: target.address });
 
   if (target) {
     sp["target_name"] = target.name;
@@ -225,9 +324,22 @@ export async function applySupportEngine(
     sp["verified_at"] = target.source_verified_at;
     sp["target_phone"] = target.phone;
   }
-  sp["route"] = plan ? { summary: plan.legs.map((l) => `${l.mode}${l.line ? " " + l.line : ""} ${l.from} → ${l.to}`).join(", "), source: plan.source, verified_at: plan.verified_at } : null;
+  sp["route"] = plan
+    ? {
+        summary: plan.legs
+          .map((l) => `${l.mode}${l.line ? " " + l.line : ""} ${l.from} → ${l.to}`)
+          .join(", "),
+        source: plan.source,
+        verified_at: plan.verified_at,
+      }
+    : null;
   sp["navigation_available"] = !!plan;
-  sp["alternatives"] = matches.slice(1, 4).map((s) => ({ name: s.name, address: s.address, source: s.source, verified_at: s.source_verified_at }));
+  sp["alternatives"] = matches.slice(1, 4).map((s) => ({
+    name: s.name,
+    address: s.address,
+    source: s.source,
+    verified_at: s.source_verified_at,
+  }));
 
   const state = ctx.derive(lvl, gap.detected, !!target, !!plan);
   a["handoff_state"] = state;

@@ -26,7 +26,10 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         const { data, error } = await sb.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name }, emailRedirectTo: `${window.location.origin}/cekani` },
+          options: {
+            data: { full_name: name },
+            emailRedirectTo: `${window.location.origin}/cekani`,
+          },
         });
         if (error) throw error;
         if (!data.session) {
@@ -65,16 +68,39 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
           {mode === "register" && (
             <div className="space-y-2">
               <Label htmlFor="name">Jméno</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required className="h-12" />
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="h-12"
+              />
             </div>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">E-mail</Label>
-            <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="h-12" />
+            <Input
+              id="email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="h-12"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Heslo</Label>
-            <Input id="password" type="password" minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={(e) => setPassword(e.target.value)} required className="h-12" />
+            <Input
+              id="password"
+              type="password"
+              minLength={8}
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="h-12"
+            />
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           {info && <p className="text-sm text-primary">{info}</p>}
@@ -84,9 +110,25 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </form>
         <p className="text-center text-sm text-muted-foreground">
           {mode === "login" ? (
-            <>Nemáte účet? <Link to="/registrace" className="font-medium text-foreground underline underline-offset-4">Registrace</Link></>
+            <>
+              Nemáte účet?{" "}
+              <Link
+                to="/registrace"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Registrace
+              </Link>
+            </>
           ) : (
-            <>Už máte účet? <Link to="/prihlaseni" className="font-medium text-foreground underline underline-offset-4">Přihlášení</Link></>
+            <>
+              Už máte účet?{" "}
+              <Link
+                to="/prihlaseni"
+                className="font-medium text-foreground underline underline-offset-4"
+              >
+                Přihlášení
+              </Link>
+            </>
           )}
         </p>
       </div>

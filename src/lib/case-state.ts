@@ -12,23 +12,62 @@ export const DOME_CASE_SCHEMA_VERSION = "1.0";
 export const REALITY_TYPES = ["FACT", "CLAIM", "INTERPRETATION", "VERIFICATION"] as const;
 export const CERTAINTIES = ["VERIFIED", "LIKELY", "POSSIBLE", "UNKNOWN", "NOT_AVAILABLE"] as const;
 export const REALITY_SOURCES = ["USER", "DOCUMENT", "OFFICIAL_SOURCE", "SYSTEM", "OTHER"] as const;
-export const NEED_CATEGORIES = ["HOUSING", "FOOD", "HYGIENE", "TRANSPORT", "HEALTH", "DOCUMENT", "INCOME", "LEGAL", "EDUCATION", "OTHER"] as const;
+export const NEED_CATEGORIES = [
+  "HOUSING",
+  "FOOD",
+  "HYGIENE",
+  "TRANSPORT",
+  "HEALTH",
+  "DOCUMENT",
+  "INCOME",
+  "LEGAL",
+  "EDUCATION",
+  "OTHER",
+] as const;
 /** Druhy ověřitelné evidence. FACT vyžaduje evidenci, kterou server umí doložit (ne jen tvrzení modelu). */
-export const EVIDENCE_KINDS = ["DOCUMENT", "OFFICIAL_SOURCE", "SYSTEM_RECORD", "OTHER_VERIFIABLE_SOURCE"] as const;
+export const EVIDENCE_KINDS = [
+  "DOCUMENT",
+  "OFFICIAL_SOURCE",
+  "SYSTEM_RECORD",
+  "OTHER_VERIFIABLE_SOURCE",
+] as const;
 export type EvidenceKind = (typeof EVIDENCE_KINDS)[number];
 /** Ověřitelný podklad dostupný serveru. DOCUMENT = nahraný dokument; ostatní druhy dodá až Evidence Engine (Fáze 2) — boundary hook. */
 export type VerifiableEvidence = { kind: EvidenceKind; ref: string };
 export const DEADLINE_ANCHORS = ["NEED", "ACTION", "EVENT", "PROCEDURE"] as const;
 export type DeadlineAnchorType = (typeof DEADLINE_ANCHORS)[number];
-export const evidenceId = (e: VerifiableEvidence) => `${e.kind.toLowerCase()}:${e.ref.toLowerCase().trim()}`;
+export const evidenceId = (e: VerifiableEvidence) =>
+  `${e.kind.toLowerCase()}:${e.ref.toLowerCase().trim()}`;
 export const NEED_URGENCIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "UNKNOWN"] as const;
 export const NEED_STATUSES = ["OPEN", "PARTIALLY_COVERED", "COVERED", "UNKNOWN"] as const;
 export const TRACK_TYPES = ["SURVIVAL", "ADMINISTRATIVE", "HOUSING", "INCOME", "SUPPORT"] as const;
-export const ACTION_PRIORITIES = ["NOW", "TODAY", "FIRST_WORKING_DAY", "THIS_WEEK", "LATER"] as const;
+export const ACTION_PRIORITIES = [
+  "NOW",
+  "TODAY",
+  "FIRST_WORKING_DAY",
+  "THIS_WEEK",
+  "LATER",
+] as const;
 export const ACTION_STATUSES = ["TODO", "IN_PROGRESS", "WAITING", "BLOCKED", "DONE"] as const;
-export const ACTION_TYPES = ["GENERAL", "OBTAIN_EVIDENCE", "PREPARE_APPLICATION", "SUBMIT_APPLICATION", "VERIFY_LEGAL_BASIS", "FOLLOW_UP_DEADLINE", "CONTACT_SUPPORT", "SECURE_BASIC_NEED"] as const;
+export const ACTION_TYPES = [
+  "GENERAL",
+  "OBTAIN_EVIDENCE",
+  "PREPARE_APPLICATION",
+  "SUBMIT_APPLICATION",
+  "VERIFY_LEGAL_BASIS",
+  "FOLLOW_UP_DEADLINE",
+  "CONTACT_SUPPORT",
+  "SECURE_BASIC_NEED",
+] as const;
 export const UNKNOWN_IMPACTS = ["HIGH", "MEDIUM", "LOW"] as const;
-export const CASE_STATUSES = ["NEW", "IN_ANALYSIS", "ACTIVE", "WAITING", "STABILIZED", "CLOSED"] as const;
+export const CASE_STATUSES = [
+  "NEW",
+  "IN_ANALYSIS",
+  "ACTIVE",
+  "WAITING",
+  "STABILIZED",
+  "CLOSED",
+] as const;
 
 export type RealityType = (typeof REALITY_TYPES)[number];
 export type Certainty = (typeof CERTAINTIES)[number];
@@ -148,7 +187,12 @@ export type DomeCaseState = {
   actions: Action[];
   unknowns: Unknown[];
   links: FutureLinks;
-  metadata: { last_updated: string; version: number; legacy_normalized: boolean; signals: NeedSignal[] };
+  metadata: {
+    last_updated: string;
+    version: number;
+    legacy_normalized: boolean;
+    signals: NeedSignal[];
+  };
 };
 
 const TRACK_META: Record<TrackType, { title: string; horizon: string }> = {
@@ -160,24 +204,70 @@ const TRACK_META: Record<TrackType, { title: string; horizon: string }> = {
 };
 
 export const emptyPerson = (): PersonMap => ({
-  current_status: null, employment_status: null, education_status: null, housing_status: null, income_status: null,
-  available_resources: [], relevant_social_context: [], relevant_procedures: [], relevant_documents: [],
+  current_status: null,
+  employment_status: null,
+  education_status: null,
+  housing_status: null,
+  income_status: null,
+  available_resources: [],
+  relevant_social_context: [],
+  relevant_procedures: [],
+  relevant_documents: [],
 });
 
 /* ---------- Vstup od modelu (draft s klíči místo ID) ---------- */
 export type CaseDraft = {
-  reality: { key: string; type: string; text: string; source: string; document_name?: string | null; evidence?: { kind: string; ref: string } | null; need_keys: string[] }[];
+  reality: {
+    key: string;
+    type: string;
+    text: string;
+    source: string;
+    document_name?: string | null;
+    evidence?: { kind: string; ref: string } | null;
+    need_keys: string[];
+  }[];
   person: PersonMap;
   needs: {
-    key: string; category: string; description: string; amount: number | null; amount_mention?: string | null; urgency: string;
-    deadline: string | null; deadline_mention?: string | null; deadline_anchor?: { type: string; key: string } | null; tracks: string[];
+    key: string;
+    category: string;
+    description: string;
+    amount: number | null;
+    amount_mention?: string | null;
+    urgency: string;
+    deadline: string | null;
+    deadline_mention?: string | null;
+    deadline_anchor?: { type: string; key: string } | null;
+    tracks: string[];
   }[];
-  actions: { key: string; title: string; description: string; type: string; priority: string; track: string | null; need_keys: string[]; depends_on: string[] }[];
-  unknowns: { key: string; question: string; why_it_matters: string; need_keys: string[]; impact: string }[];
+  actions: {
+    key: string;
+    title: string;
+    description: string;
+    type: string;
+    priority: string;
+    track: string | null;
+    need_keys: string[];
+    depends_on: string[];
+  }[];
+  unknowns: {
+    key: string;
+    question: string;
+    why_it_matters: string;
+    need_keys: string[];
+    impact: string;
+  }[];
 };
 
-const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "x";
-const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T => (allowed.includes(v as T) ? (v as T) : fallback);
+const slug = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 40) || "x";
+const pick = <T extends string>(v: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(v as T) ? (v as T) : fallback;
 
 /**
  * Sestaví nový canonical stav z draftu modelu + předchozího stavu.
@@ -205,54 +295,79 @@ export function buildCaseState(input: {
   const joinThousands = (x: string) => x.replace(/(\d)[\s.\u00a0](?=\d{3}\b)/g, "$1"); // 5 000 / 5.000 → 5000
   const numbersIn = (x: string) => [...new Set(joinThousands(x).match(/\d+/g) ?? [])];
   /** Citace musí doslova existovat ve výrocích uživatele / obsahu dokumentu. */
-  const quoted = (m: unknown): string | null => (typeof m === "string" && m.trim().length >= 3 && evidence.includes(norm(m)) ? norm(m) : null);
+  const quoted = (m: unknown): string | null =>
+    typeof m === "string" && m.trim().length >= 3 && evidence.includes(norm(m)) ? norm(m) : null;
   // Seznam ověřitelných podkladů: nahrané dokumenty + případné další ověřené zdroje (hook).
   const verifiable = new Set([
-    ...(input.documentNames ?? []).filter(Boolean).map((n) => evidenceId({ kind: "DOCUMENT", ref: n })),
+    ...(input.documentNames ?? [])
+      .filter(Boolean)
+      .map((n) => evidenceId({ kind: "DOCUMENT", ref: n })),
     ...(input.verifiableEvidence ?? []).map(evidenceId),
   ]);
   const rawNeeds = (d0: Partial<CaseDraft>) => d0.needs ?? [];
 
   /** AMOUNT: MENTION → NEED → AMOUNT. Jinak null/UNKNOWN. */
   const amountMentions = new Map<string, number>();
-  rawNeeds(input.draft ?? {}).forEach((n) => { const q = quoted(n.amount_mention); if (q) amountMentions.set(q, (amountMentions.get(q) ?? 0) + 1); });
-  const bindAmount = (n: CaseDraft["needs"][number]): { amount: number | null; mention: string | null } => {
+  rawNeeds(input.draft ?? {}).forEach((n) => {
+    const q = quoted(n.amount_mention);
+    if (q) amountMentions.set(q, (amountMentions.get(q) ?? 0) + 1);
+  });
+  const bindAmount = (
+    n: CaseDraft["needs"][number],
+  ): { amount: number | null; mention: string | null } => {
     const v = n.amount;
-    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0) return { amount: null, mention: null };
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0)
+      return { amount: null, mention: null };
     const q = quoted(n.amount_mention);
     if (!q || amountMentions.get(q) !== 1) return { amount: null, mention: null }; // žádná / sdílená citace = nejednoznačné
     const nums = numbersIn(q);
-    if (nums.length !== 1 || nums[0] !== String(Math.round(v))) return { amount: null, mention: null }; // citace musí obsahovat právě tuto jednu částku
+    if (nums.length !== 1 || nums[0] !== String(Math.round(v)))
+      return { amount: null, mention: null }; // citace musí obsahovat právě tuto jednu částku
     return { amount: v, mention: q };
   };
 
   /** DEADLINE: MENTION → (NEED | ACTION | EVENT | PROCEDURE) → DEADLINE. Jinak null/UNKNOWN. */
   const deadlineMentions = new Map<string, number>();
-  rawNeeds(input.draft ?? {}).forEach((n) => { const q = quoted(n.deadline_mention); if (q) deadlineMentions.set(q, (deadlineMentions.get(q) ?? 0) + 1); });
-  const draftActionIds = new Set((input.draft?.actions ?? []).map((a) => `act_${slug(a.key || a.title)}`));
-  const bindDeadline = (n: CaseDraft["needs"][number], needId: string): { deadline: string | null; mention: string | null; anchor: Need["deadline_anchor"] } => {
+  rawNeeds(input.draft ?? {}).forEach((n) => {
+    const q = quoted(n.deadline_mention);
+    if (q) deadlineMentions.set(q, (deadlineMentions.get(q) ?? 0) + 1);
+  });
+  const draftActionIds = new Set(
+    (input.draft?.actions ?? []).map((a) => `act_${slug(a.key || a.title)}`),
+  );
+  const bindDeadline = (
+    n: CaseDraft["needs"][number],
+    needId: string,
+  ): { deadline: string | null; mention: string | null; anchor: Need["deadline_anchor"] } => {
     const none = { deadline: null, mention: null, anchor: null };
     if (typeof n.deadline !== "string" || !n.deadline.trim()) return none;
     const q = quoted(n.deadline_mention);
     if (!q || deadlineMentions.get(q) !== 1) return none;
     const dl = norm(n.deadline);
     const dn = numbersIn(dl);
-    if (!(q.includes(dl) || (dn.length > 0 && dn.every((x) => numbersIn(q).includes(x))))) return none;
+    if (!(q.includes(dl) || (dn.length > 0 && dn.every((x) => numbersIn(q).includes(x)))))
+      return none;
     const at = n.deadline_anchor;
     if (!at || !DEADLINE_ANCHORS.includes(at.type as DeadlineAnchorType)) return none;
     const key = typeof at.key === "string" ? at.key.trim() : "";
     let ref: string | null = null;
     if (at.type === "NEED") ref = !key || `need_${slug(key)}` === needId ? needId : null;
-    else if (at.type === "ACTION") ref = key && draftActionIds.has(`act_${slug(key)}`) ? `act_${slug(key)}` : null;
+    else if (at.type === "ACTION")
+      ref = key && draftActionIds.has(`act_${slug(key)}`) ? `act_${slug(key)}` : null;
     else ref = key || null; // EVENT / PROCEDURE: pojmenovaná událost / řízení
     if (!ref) return none;
-    return { deadline: n.deadline.trim(), mention: q, anchor: { type: at.type as DeadlineAnchorType, ref } };
+    return {
+      deadline: n.deadline.trim(),
+      mention: q,
+      anchor: { type: at.type as DeadlineAnchorType, ref },
+    };
   };
   const now = (input.now ?? new Date()).toISOString();
   const d = input.draft ?? {};
   const prev = input.previous;
   const det = detectImmediateNeeds(input.userText);
-  const prevCreated = (id: string, list: { id: string; created_at: string }[] | undefined) => list?.find((x) => x.id === id)?.created_at ?? now;
+  const prevCreated = (id: string, list: { id: string; created_at: string }[] | undefined) =>
+    list?.find((x) => x.id === id)?.created_at ?? now;
 
   const needs: Need[] = (d.needs ?? []).map((n) => {
     const id = `need_${slug(n.key || n.description)}`;
@@ -263,27 +378,53 @@ export function buildCaseState(input: {
       id,
       category: pick(n.category, NEED_CATEGORIES, "OTHER"),
       description: String(n.description ?? ""),
-      amount: am.amount, amount_status: am.amount === null ? "UNKNOWN" : "KNOWN", amount_mention: am.mention,
+      amount: am.amount,
+      amount_status: am.amount === null ? "UNKNOWN" : "KNOWN",
+      amount_mention: am.mention,
       currency: "CZK",
       urgency: pick(n.urgency, NEED_URGENCIES, "UNKNOWN"),
-      deadline: dl.deadline, deadline_status: dl.deadline === null ? "UNKNOWN" : "KNOWN", deadline_mention: dl.mention, deadline_anchor: dl.anchor,
+      deadline: dl.deadline,
+      deadline_status: dl.deadline === null ? "UNKNOWN" : "KNOWN",
+      deadline_mention: dl.mention,
+      deadline_anchor: dl.anchor,
       evidence_ids: [],
       status: old?.status ?? "OPEN",
-      track_ids: (n.tracks ?? []).filter((t) => TRACK_TYPES.includes(t as TrackType)).map((t) => `track_${t.toLowerCase()}`),
+      track_ids: (n.tracks ?? [])
+        .filter((t) => TRACK_TYPES.includes(t as TrackType))
+        .map((t) => `track_${t.toLowerCase()}`),
       route_ids: [],
       created_at: old?.created_at ?? now,
     };
   });
   // Krizová pojistka z detektoru: dnešní nocleh nesmí chybět, pokud ho uživatel uvedl.
-  const tonight = needs.find((n) => n.category === "HOUSING" && (n.urgency === "CRITICAL" || n.urgency === "HIGH"));
+  const tonight = needs.find(
+    (n) => n.category === "HOUSING" && (n.urgency === "CRITICAL" || n.urgency === "HIGH"),
+  );
   if (det.signals.includes("no_shelter_tonight") && tonight) {
     tonight.urgency = "CRITICAL";
     if (!tonight.track_ids.includes("track_survival")) tonight.track_ids.push("track_survival");
-  } else if (det.signals.includes("no_shelter_tonight") && !needs.some((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")) {
+  } else if (
+    det.signals.includes("no_shelter_tonight") &&
+    !needs.some((n) => n.category === "HOUSING" && n.urgency === "CRITICAL")
+  ) {
     needs.unshift({
-      id: "need_dnesni_nocleh", category: "HOUSING", description: "Bezpečné místo na dnešní noc", amount: null, amount_status: "UNKNOWN", amount_mention: null, currency: "CZK",
-      urgency: "CRITICAL", deadline: null, deadline_status: "UNKNOWN", deadline_mention: null, deadline_anchor: null, evidence_ids: [], status: prev?.needs.find((x) => x.id === "need_dnesni_nocleh")?.status ?? "OPEN",
-      track_ids: ["track_survival"], route_ids: [], created_at: prevCreated("need_dnesni_nocleh", prev?.needs),
+      id: "need_dnesni_nocleh",
+      category: "HOUSING",
+      description: "Bezpečné místo na dnešní noc",
+      amount: null,
+      amount_status: "UNKNOWN",
+      amount_mention: null,
+      currency: "CZK",
+      urgency: "CRITICAL",
+      deadline: null,
+      deadline_status: "UNKNOWN",
+      deadline_mention: null,
+      deadline_anchor: null,
+      evidence_ids: [],
+      status: prev?.needs.find((x) => x.id === "need_dnesni_nocleh")?.status ?? "OPEN",
+      track_ids: ["track_survival"],
+      route_ids: [],
+      created_at: prevCreated("need_dnesni_nocleh", prev?.needs),
     });
   }
   const needIds = new Set(needs.map((n) => n.id));
@@ -291,14 +432,29 @@ export function buildCaseState(input: {
 
   // Tracks: aktivuje je potřeba (model) i krizový detektor.
   const trackTypes = new Set<TrackType>();
-  needs.forEach((n) => n.track_ids.forEach((t) => trackTypes.add(t.replace("track_", "").toUpperCase() as TrackType)));
-  if (det.profile === "HIGH_IMMEDIATE_SUPPORT" || det.profile === "SAFETY") ["SURVIVAL", "SUPPORT"].forEach((t) => trackTypes.add(t as TrackType));
-  if (det.signals.includes("no_shelter_tonight") || det.signals.includes("housing_loss_risk")) trackTypes.add("HOUSING");
-  if (det.signals.includes("mop") || det.signals.includes("admin_deadline")) trackTypes.add("ADMINISTRATIVE");
-  (d.actions ?? []).forEach((a) => a.track && TRACK_TYPES.includes(a.track as TrackType) && trackTypes.add(a.track as TrackType));
+  needs.forEach((n) =>
+    n.track_ids.forEach((t) => trackTypes.add(t.replace("track_", "").toUpperCase() as TrackType)),
+  );
+  if (det.profile === "HIGH_IMMEDIATE_SUPPORT" || det.profile === "SAFETY")
+    ["SURVIVAL", "SUPPORT"].forEach((t) => trackTypes.add(t as TrackType));
+  if (det.signals.includes("no_shelter_tonight") || det.signals.includes("housing_loss_risk"))
+    trackTypes.add("HOUSING");
+  if (det.signals.includes("mop") || det.signals.includes("admin_deadline"))
+    trackTypes.add("ADMINISTRATIVE");
+  (d.actions ?? []).forEach(
+    (a) =>
+      a.track && TRACK_TYPES.includes(a.track as TrackType) && trackTypes.add(a.track as TrackType),
+  );
   const tracks: Track[] = TRACK_TYPES.filter((t) => trackTypes.has(t)).map((t) => {
     const id = `track_${t.toLowerCase()}`;
-    return { id, type: t, ...TRACK_META[t], active: true, need_ids: needs.filter((n) => n.track_ids.includes(id)).map((n) => n.id), created_at: prevCreated(id, prev?.tracks) };
+    return {
+      id,
+      type: t,
+      ...TRACK_META[t],
+      active: true,
+      need_ids: needs.filter((n) => n.track_ids.includes(id)).map((n) => n.id),
+      created_at: prevCreated(id, prev?.tracks),
+    };
   });
   const trackIds = new Set(tracks.map((t) => t.id));
   needs.forEach((n) => (n.track_ids = n.track_ids.filter((t) => trackIds.has(t))));
@@ -307,19 +463,39 @@ export function buildCaseState(input: {
     let type = pick(r.type, REALITY_TYPES, "CLAIM");
     let source = pick(r.source, REALITY_SOURCES, "USER");
     // CLAIM ≠ FACT: FACT jen s ověřitelnou evidencí, kterou server zná (dokument / oficiální zdroj / systémový záznam / jiný ověřitelný zdroj).
-    const claimed: VerifiableEvidence | null = r.evidence && EVIDENCE_KINDS.includes(r.evidence.kind as EvidenceKind) && typeof r.evidence.ref === "string"
-      ? { kind: r.evidence.kind as EvidenceKind, ref: r.evidence.ref }
-      : typeof r.document_name === "string" && r.document_name.trim() ? { kind: "DOCUMENT", ref: r.document_name } : null;
+    const claimed: VerifiableEvidence | null =
+      r.evidence &&
+      EVIDENCE_KINDS.includes(r.evidence.kind as EvidenceKind) &&
+      typeof r.evidence.ref === "string"
+        ? { kind: r.evidence.kind as EvidenceKind, ref: r.evidence.ref }
+        : typeof r.document_name === "string" && r.document_name.trim()
+          ? { kind: "DOCUMENT", ref: r.document_name }
+          : null;
     const evId = claimed && verifiable.has(evidenceId(claimed)) ? evidenceId(claimed) : null;
     if (source === "USER" && type === "FACT") type = "CLAIM"; // tvrzení uživatele se nikdy samo nestane FACT
     if (type === "FACT" && !evId) type = source === "USER" ? "CLAIM" : "VERIFICATION";
-    if (type === "FACT" && claimed) source = claimed.kind === "DOCUMENT" ? "DOCUMENT" : claimed.kind === "OFFICIAL_SOURCE" ? "OFFICIAL_SOURCE" : claimed.kind === "SYSTEM_RECORD" ? "SYSTEM" : "OTHER";
+    if (type === "FACT" && claimed)
+      source =
+        claimed.kind === "DOCUMENT"
+          ? "DOCUMENT"
+          : claimed.kind === "OFFICIAL_SOURCE"
+            ? "OFFICIAL_SOURCE"
+            : claimed.kind === "SYSTEM_RECORD"
+              ? "SYSTEM"
+              : "OTHER";
     else if (source !== "USER" && source !== "SYSTEM") source = "OTHER"; // nedoložený zdroj se nevydává za dokument/úřad
-    const certainty: Certainty = type === "FACT" ? "VERIFIED" : type === "VERIFICATION" ? "UNKNOWN" : "POSSIBLE";
+    const certainty: Certainty =
+      type === "FACT" ? "VERIFIED" : type === "VERIFICATION" ? "UNKNOWN" : "POSSIBLE";
     const id = `real_${slug(r.key || r.text)}`;
     return {
-      id, type, text: String(r.text ?? ""), certainty, source, evidence_ids: type === "FACT" && evId ? [evId] : [],
-      related_need_ids: (r.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)), related_route_ids: [],
+      id,
+      type,
+      text: String(r.text ?? ""),
+      certainty,
+      source,
+      evidence_ids: type === "FACT" && evId ? [evId] : [],
+      related_need_ids: (r.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)),
+      related_route_ids: [],
       created_at: prevCreated(id, prev?.reality),
     };
   });
@@ -330,39 +506,62 @@ export function buildCaseState(input: {
   const actions: Action[] = rawActions.map((a) => {
     const id = actKey(a.key || a.title);
     const old = prev?.actions.find((x) => x.id === id);
-    const track = a.track && trackIds.has(`track_${a.track.toLowerCase()}`) ? `track_${a.track.toLowerCase()}` : null;
+    const track =
+      a.track && trackIds.has(`track_${a.track.toLowerCase()}`)
+        ? `track_${a.track.toLowerCase()}`
+        : null;
     return {
-      id, title: String(a.title ?? ""), description: String(a.description ?? ""),
+      id,
+      title: String(a.title ?? ""),
+      description: String(a.description ?? ""),
       type: pick(a.type, ACTION_TYPES, "GENERAL"),
       priority: pick(a.priority, ACTION_PRIORITIES, "LATER"),
-      status: old?.status ?? "TODO", status_reason: old?.status_reason ?? null,
+      status: old?.status ?? "TODO",
+      status_reason: old?.status_reason ?? null,
       track_id: track,
       need_ids: (a.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)),
-      evidence_ids: [], deadline_id: null, route_id: null,
-      depends_on_action_ids: (a.depends_on ?? []).map(actKey).filter((x) => actionIds.has(x) && x !== id),
-      created_at: old?.created_at ?? now, completed_at: old?.completed_at ?? null,
+      evidence_ids: [],
+      deadline_id: null,
+      route_id: null,
+      depends_on_action_ids: (a.depends_on ?? [])
+        .map(actKey)
+        .filter((x) => actionIds.has(x) && x !== id),
+      created_at: old?.created_at ?? now,
+      completed_at: old?.completed_at ?? null,
     };
   });
   // Uživatelem upravené akce, které model tentokrát vynechal, se neztrácejí.
   prev?.actions.forEach((o) => {
-    if (!actions.some((a) => a.id === o.id) && o.status !== "TODO") actions.push({ ...o, track_id: o.track_id && trackIds.has(o.track_id) ? o.track_id : null, need_ids: o.need_ids.filter((x) => needIds.has(x)), depends_on_action_ids: [] });
+    if (!actions.some((a) => a.id === o.id) && o.status !== "TODO")
+      actions.push({
+        ...o,
+        track_id: o.track_id && trackIds.has(o.track_id) ? o.track_id : null,
+        need_ids: o.need_ids.filter((x) => needIds.has(x)),
+        depends_on_action_ids: [],
+      });
   });
 
   const unknowns: Unknown[] = (d.unknowns ?? [])
     .filter((u) => u.why_it_matters?.trim()) // otázka bez důvodu se neklade
     .map((u) => ({
-      id: `unk_${slug(u.key || u.question)}`, question: String(u.question ?? ""), why_it_matters: String(u.why_it_matters),
-      affects_need_ids: (u.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)), affects_route_ids: [],
+      id: `unk_${slug(u.key || u.question)}`,
+      question: String(u.question ?? ""),
+      why_it_matters: String(u.why_it_matters),
+      affects_need_ids: (u.need_keys ?? []).map(needKey).filter((x) => needIds.has(x)),
+      affects_route_ids: [],
       impact: pick(u.impact, UNKNOWN_IMPACTS, "MEDIUM"),
     }));
 
   // Deadline hook (Deadline Engine = Fáze 2): lhůta zjištěná z dokumentu se jen eviduje, datum se nedopočítává.
-  const links: FutureLinks = prev?.links ? { ...prev.links, deadlines: [...prev.links.deadlines] } : { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] };
+  const links: FutureLinks = prev?.links
+    ? { ...prev.links, deadlines: [...prev.links.deadlines] }
+    : { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] };
   reality
     .filter((r) => r.source === "DOCUMENT" && /lhůt|do\s+\d+\s+dn|odvolání/i.test(r.text))
     .forEach((r) => {
       const id = `dl_${r.id.slice(5)}`;
-      if (!links.deadlines.some((x) => x.id === id)) links.deadlines.push({ id, label: r.text, date: null, source: "DOCUMENT" });
+      if (!links.deadlines.some((x) => x.id === id))
+        links.deadlines.push({ id, label: r.text, date: null, source: "DOCUMENT" });
     });
 
   const state: DomeCaseState = {
@@ -373,9 +572,17 @@ export function buildCaseState(input: {
     system_interpretation: input.interpretation,
     reality,
     person: { ...emptyPerson(), ...(d.person ?? {}) },
-    needs, tracks, actions, unknowns,
+    needs,
+    tracks,
+    actions,
+    unknowns,
     links,
-    metadata: { last_updated: now, version: (prev?.metadata.version ?? 0) + 1, legacy_normalized: false, signals: det.signals },
+    metadata: {
+      last_updated: now,
+      version: (prev?.metadata.version ?? 0) + 1,
+      legacy_normalized: false,
+      signals: det.signals,
+    },
   };
   return state;
 }
@@ -395,37 +602,68 @@ export function validateCaseState(s: DomeCaseState): string[] {
     uniq(r.id);
     if (!REALITY_TYPES.includes(r.type)) e.push(`reality ${r.id}: type`);
     if (!CERTAINTIES.includes(r.certainty)) e.push(`reality ${r.id}: certainty`);
-    if (r.type === "FACT" && r.source === "USER") e.push(`reality ${r.id}: tvrzení uživatele nesmí být FACT`);
-    if (r.type === "FACT" && (r.evidence_ids.length === 0 || r.certainty !== "VERIFIED" || !r.evidence_ids.every((x) => EVIDENCE_KINDS.some((k) => x.startsWith(`${k.toLowerCase()}:`)))))
+    if (r.type === "FACT" && r.source === "USER")
+      e.push(`reality ${r.id}: tvrzení uživatele nesmí být FACT`);
+    if (
+      r.type === "FACT" &&
+      (r.evidence_ids.length === 0 ||
+        r.certainty !== "VERIFIED" ||
+        !r.evidence_ids.every((x) =>
+          EVIDENCE_KINDS.some((k) => x.startsWith(`${k.toLowerCase()}:`)),
+        ))
+    )
       e.push(`reality ${r.id}: FACT bez evidence`);
-    if (r.type !== "FACT" && r.certainty === "VERIFIED") e.push(`reality ${r.id}: VERIFIED jen u FACT`);
-    r.related_need_ids.forEach((x) => needIds.has(x) || e.push(`reality ${r.id}: neznámá potřeba ${x}`));
+    if (r.type !== "FACT" && r.certainty === "VERIFIED")
+      e.push(`reality ${r.id}: VERIFIED jen u FACT`);
+    r.related_need_ids.forEach(
+      (x) => needIds.has(x) || e.push(`reality ${r.id}: neznámá potřeba ${x}`),
+    );
   });
   s.needs.forEach((n) => {
     uniq(n.id);
     if (!NEED_CATEGORIES.includes(n.category)) e.push(`need ${n.id}: category`);
     if (!NEED_URGENCIES.includes(n.urgency)) e.push(`need ${n.id}: urgency`);
     if (!NEED_STATUSES.includes(n.status)) e.push(`need ${n.id}: status`);
-    if (n.amount !== null && !(typeof n.amount === "number" && n.amount > 0)) e.push(`need ${n.id}: amount`);
-    if ((n.amount === null) !== (n.amount_status === "UNKNOWN") || (n.amount !== null && !n.amount_mention)) e.push(`need ${n.id}: částka bez vazby`);
-    if ((n.deadline === null) !== (n.deadline_status === "UNKNOWN") || (n.deadline !== null && (!n.deadline_mention || !n.deadline_anchor || !DEADLINE_ANCHORS.includes(n.deadline_anchor.type))))
+    if (n.amount !== null && !(typeof n.amount === "number" && n.amount > 0))
+      e.push(`need ${n.id}: amount`);
+    if (
+      (n.amount === null) !== (n.amount_status === "UNKNOWN") ||
+      (n.amount !== null && !n.amount_mention)
+    )
+      e.push(`need ${n.id}: částka bez vazby`);
+    if (
+      (n.deadline === null) !== (n.deadline_status === "UNKNOWN") ||
+      (n.deadline !== null &&
+        (!n.deadline_mention ||
+          !n.deadline_anchor ||
+          !DEADLINE_ANCHORS.includes(n.deadline_anchor.type)))
+    )
       e.push(`need ${n.id}: lhůta bez vazby`);
     n.track_ids.forEach((x) => trackIds.has(x) || e.push(`need ${n.id}: neznámý track ${x}`));
   });
-  s.tracks.forEach((t) => { uniq(t.id); if (!TRACK_TYPES.includes(t.type)) e.push(`track ${t.id}: type`); });
+  s.tracks.forEach((t) => {
+    uniq(t.id);
+    if (!TRACK_TYPES.includes(t.type)) e.push(`track ${t.id}: type`);
+  });
   s.actions.forEach((a) => {
     uniq(a.id);
     if (!ACTION_PRIORITIES.includes(a.priority)) e.push(`action ${a.id}: priority`);
     if (!ACTION_STATUSES.includes(a.status)) e.push(`action ${a.id}: status`);
     if (!ACTION_TYPES.includes(a.type)) e.push(`action ${a.id}: type`);
     if (a.track_id && !trackIds.has(a.track_id)) e.push(`action ${a.id}: neznámý track`);
-    if ((a.status === "WAITING" || a.status === "BLOCKED") && !a.status_reason?.trim()) e.push(`action ${a.id}: chybí důvod`);
+    if ((a.status === "WAITING" || a.status === "BLOCKED") && !a.status_reason?.trim())
+      e.push(`action ${a.id}: chybí důvod`);
     if (a.status === "DONE" && !a.completed_at) e.push(`action ${a.id}: DONE bez času`);
     a.need_ids.forEach((x) => needIds.has(x) || e.push(`action ${a.id}: neznámá potřeba ${x}`));
-    a.depends_on_action_ids.forEach((x) => actionIds.has(x) || e.push(`action ${a.id}: neznámá závislost ${x}`));
+    a.depends_on_action_ids.forEach(
+      (x) => actionIds.has(x) || e.push(`action ${a.id}: neznámá závislost ${x}`),
+    );
   });
   if (hasCycle(s.actions)) e.push("cyklická závislost akcí");
-  s.unknowns.forEach((u) => { uniq(u.id); if (!u.why_it_matters) e.push(`unknown ${u.id}: chybí důvod`); });
+  s.unknowns.forEach((u) => {
+    uniq(u.id);
+    if (!u.why_it_matters) e.push(`unknown ${u.id}: chybí důvod`);
+  });
   return e;
 }
 
@@ -449,18 +687,31 @@ export function isActionBlocked(a: Action, all: Action[]): boolean {
 }
 
 /** Změna statusu akce uživatelem → nová verze stavu (stará zůstává v historii kroků). */
-export function applyActionStatus(s: DomeCaseState, actionId: string, status: ActionStatus, reason: string | null, now = new Date()): DomeCaseState {
+export function applyActionStatus(
+  s: DomeCaseState,
+  actionId: string,
+  status: ActionStatus,
+  reason: string | null,
+  now = new Date(),
+): DomeCaseState {
   const a = s.actions.find((x) => x.id === actionId);
   if (!a) throw new Error("Akce v aktuálním stavu případu neexistuje.");
   if (!ACTION_STATUSES.includes(status)) throw new Error("Neplatný stav akce.");
-  if ((status === "WAITING" || status === "BLOCKED") && !reason?.trim()) throw new Error("U stavu Čeká / Blokováno uveďte důvod.");
-  if ((status === "DONE" || status === "IN_PROGRESS") && isActionBlocked(a, s.actions)) throw new Error("Tuto akci nejde začít, dokud nejsou hotové akce, na kterých závisí.");
+  if ((status === "WAITING" || status === "BLOCKED") && !reason?.trim())
+    throw new Error("U stavu Čeká / Blokováno uveďte důvod.");
+  if ((status === "DONE" || status === "IN_PROGRESS") && isActionBlocked(a, s.actions))
+    throw new Error("Tuto akci nejde začít, dokud nejsou hotové akce, na kterých závisí.");
   const iso = now.toISOString();
   return {
     ...s,
     actions: s.actions.map((x) =>
       x.id === actionId
-        ? { ...x, status, status_reason: status === "WAITING" || status === "BLOCKED" ? reason!.trim() : null, completed_at: status === "DONE" ? iso : null }
+        ? {
+            ...x,
+            status,
+            status_reason: status === "WAITING" || status === "BLOCKED" ? reason!.trim() : null,
+            completed_at: status === "DONE" ? iso : null,
+          }
         : x,
     ),
     metadata: { ...s.metadata, last_updated: iso, version: s.metadata.version + 1 },
@@ -473,24 +724,74 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
     if (!assessment || typeof assessment !== "object") return null;
     const a = assessment as Record<string, unknown>;
     const cs = a["case_state"] as DomeCaseState | undefined;
-    if (cs && cs.dome_case_schema_version === DOME_CASE_SCHEMA_VERSION && Array.isArray(cs.actions)) {
-      return { ...cs, person: { ...emptyPerson(), ...(cs.person ?? {}) }, links: cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] }, unknowns: cs.unknowns ?? [], reality: cs.reality ?? [], needs: (cs.needs ?? []).map(normalizeNeed), tracks: cs.tracks ?? [] };
+    if (
+      cs &&
+      cs.dome_case_schema_version === DOME_CASE_SCHEMA_VERSION &&
+      Array.isArray(cs.actions)
+    ) {
+      return {
+        ...cs,
+        person: { ...emptyPerson(), ...(cs.person ?? {}) },
+        links: cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] },
+        unknowns: cs.unknowns ?? [],
+        reality: cs.reality ?? [],
+        needs: (cs.needs ?? []).map(normalizeNeed),
+        tracks: cs.tracks ?? [],
+      };
     }
     // Legacy (dome-core 1.x/2.0): převedeme jen to, co v něm skutečně je — bez akcí a bez vymýšlení.
     const arr = (k: string) => (Array.isArray(a[k]) ? (a[k] as unknown[]).map(String) : []);
     const t = new Date(0).toISOString();
     const reality: RealityItem[] = [
-      ...arr("stated_by_user").map((x, i) => ({ id: `real_legacy_c${i}`, type: "CLAIM" as const, text: x, certainty: "POSSIBLE" as const, source: "USER" as const })),
+      ...arr("stated_by_user").map((x, i) => ({
+        id: `real_legacy_c${i}`,
+        type: "CLAIM" as const,
+        text: x,
+        certainty: "POSSIBLE" as const,
+        source: "USER" as const,
+      })),
       // Starší "verified" nemá dohledatelnou evidenci → nikdy FACT; jen k (opětovnému) ověření.
-      ...arr("verified").map((x, i) => ({ id: `real_legacy_f${i}`, type: "VERIFICATION" as const, text: x, certainty: "LIKELY" as const, source: "OTHER" as const })),
-      ...arr("to_verify").map((x, i) => ({ id: `real_legacy_v${i}`, type: "VERIFICATION" as const, text: x, certainty: "UNKNOWN" as const, source: "SYSTEM" as const })),
-    ].map((r) => ({ ...r, evidence_ids: [], related_need_ids: [], related_route_ids: [], created_at: t }));
+      ...arr("verified").map((x, i) => ({
+        id: `real_legacy_f${i}`,
+        type: "VERIFICATION" as const,
+        text: x,
+        certainty: "LIKELY" as const,
+        source: "OTHER" as const,
+      })),
+      ...arr("to_verify").map((x, i) => ({
+        id: `real_legacy_v${i}`,
+        type: "VERIFICATION" as const,
+        text: x,
+        certainty: "UNKNOWN" as const,
+        source: "SYSTEM" as const,
+      })),
+    ].map((r) => ({
+      ...r,
+      evidence_ids: [],
+      related_need_ids: [],
+      related_route_ids: [],
+      created_at: t,
+    }));
     const goal = (a["user_goal"] as { text?: string } | undefined)?.text ?? null;
     return {
-      dome_case_schema_version: DOME_CASE_SCHEMA_VERSION, case_id: caseId, status: "IN_ANALYSIS", user_goal: goal,
+      dome_case_schema_version: DOME_CASE_SCHEMA_VERSION,
+      case_id: caseId,
+      status: "IN_ANALYSIS",
+      user_goal: goal,
       system_interpretation: (a["hypothesis"] as { text?: string } | undefined)?.text ?? null,
-      reality, person: emptyPerson(), needs: [], tracks: [], actions: [],
-      unknowns: arr("missing_information").map((q, i) => ({ id: `unk_legacy_${i}`, question: q, why_it_matters: "Převzato ze staršího vyhodnocení.", affects_need_ids: [], affects_route_ids: [], impact: "MEDIUM" as const })),
+      reality,
+      person: emptyPerson(),
+      needs: [],
+      tracks: [],
+      actions: [],
+      unknowns: arr("missing_information").map((q, i) => ({
+        id: `unk_legacy_${i}`,
+        question: q,
+        why_it_matters: "Převzato ze staršího vyhodnocení.",
+        affects_need_ids: [],
+        affects_route_ids: [],
+        impact: "MEDIUM" as const,
+      })),
       links: { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] },
       metadata: { last_updated: t, version: 0, legacy_normalized: true, signals: [] },
     };
@@ -501,7 +802,15 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
 
 /* ---------- Hooky budoucích enginů (Fáze 2+) ---------- */
 export interface CaseEngine {
-  readonly name: "LEGAL_ROUTE" | "EVIDENCE" | "DEADLINE" | "RISK" | "CROSS_LINK" | "GAP" | "ROUTE_COMPETITION" | "SECOND_LOOK";
+  readonly name:
+    | "LEGAL_ROUTE"
+    | "EVIDENCE"
+    | "DEADLINE"
+    | "RISK"
+    | "CROSS_LINK"
+    | "GAP"
+    | "ROUTE_COMPETITION"
+    | "SECOND_LOOK";
   /** Vrací upravený stav; musí projít validateCaseState. */
   apply(state: DomeCaseState): Promise<DomeCaseState>;
 }
@@ -513,8 +822,12 @@ function normalizeNeed(n: Need): Need {
   const dlOk = typeof n.deadline === "string" && n.deadline_mention && n.deadline_anchor;
   return {
     ...n,
-    amount: am, amount_status: am === null ? "UNKNOWN" : "KNOWN", amount_mention: am === null ? null : n.amount_mention,
-    deadline: dlOk ? n.deadline : null, deadline_status: dlOk ? "KNOWN" : "UNKNOWN",
-    deadline_mention: dlOk ? n.deadline_mention : null, deadline_anchor: dlOk ? n.deadline_anchor : null,
+    amount: am,
+    amount_status: am === null ? "UNKNOWN" : "KNOWN",
+    amount_mention: am === null ? null : n.amount_mention,
+    deadline: dlOk ? n.deadline : null,
+    deadline_status: dlOk ? "KNOWN" : "UNKNOWN",
+    deadline_mention: dlOk ? n.deadline_mention : null,
+    deadline_anchor: dlOk ? n.deadline_anchor : null,
   };
 }
