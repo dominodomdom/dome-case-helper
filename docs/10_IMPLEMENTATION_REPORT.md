@@ -20,7 +20,7 @@ Project remains **not production-ready** pending live DB/auth verification.
 | Type check | `bunx tsgo --noEmit -p .` | pass | pass |
 | Tests | `bunx vitest run` | 54/54 | 63/63 |
 | Lint | `bunx eslint .` | 501 (495 errors) | 0 errors, 6 warnings (`react-refresh/only-export-components`, harmless; fixing needs file splits) |
-| Build | `bun run build` | not re-run | pass (run after formatting; before the AI-boundary edit — final re-run noted in J) |
+| Build | `bun run build` | not re-run | pass (re-run after all edits) |
 
 ## D. AI architecture
 See docs/05. Adding a provider = new `AiProvider` + id in `getAiProvider`; domain code unchanged.
@@ -46,7 +46,7 @@ docs/09 items 1–7.
 2. Signed-in E2E. 3. `03_deprecate_2param.sql`. 4. Fix S1–S3. 5. Clean-machine build.
 
 ## J. Honesty check
-- Executed: type check, tests, lint, build (see C; build re-run after final edits — see chat).
+- Executed: type check, tests, lint, build — all after the final edits.
 - Only proposed: SQL audit/concurrency tests, E2E, security fixes S1–S3.
 - Not verifiable here: real DB behaviour, RLS, signed-in flows, non-Lovable hosting.
 - Database files changed: no. Live database changes: none performed by this task.
