@@ -16,6 +16,16 @@ export type UradCase = {
 
 const c = SCHEMA.cases.columns;
 
+function throwSafeDatabaseError(
+  operation: string,
+  error: { code?: string | null; message?: string | null },
+  userMessage: string,
+): never {
+  // Keep diagnostics useful without surfacing raw Postgres/PostgREST details in UI errors.
+  console.error(operation, { code: error.code ?? null });
+  throw new Error(userMessage);
+}
+
 /** Explicitní projekce skutečných sloupců public.urad_cases. */
 const CASE_SELECT = [
   c.id,
@@ -115,7 +125,12 @@ export async function listCases(): Promise<UradCase[]> {
     .from(SCHEMA.cases.table)
     .select(CASE_SELECT)
     .order(c.createdAt, { ascending: false });
-  if (error) throw error;
+  if (error)
+    throwSafeDatabaseError(
+      "urad-api.listCases",
+      error,
+      "Seznam případů se nepodařilo načíst. Zkuste to prosím znovu.",
+    );
   return (data ?? []).map((row) => mapCase(row as unknown as Record<string, unknown>));
 }
 
@@ -125,7 +140,12 @@ export async function getCase(id: string): Promise<UradCase | null> {
     .select(CASE_SELECT)
     .eq(c.id, id)
     .maybeSingle();
-  if (error) throw error;
+  if (error)
+    throwSafeDatabaseError(
+      "urad-api.getCase",
+      error,
+      "Případ se nepodařilo načíst. Zkuste to prosím znovu.",
+    );
   return data ? mapCase(data as unknown as Record<string, unknown>) : null;
 }
 
@@ -148,12 +168,12 @@ export async function createCase(input: { title: string; description: string }) 
     })
     .select(CASE_SELECT)
     .single();
-  if (error) {
-    // Předáváme skutečnou chybu Supabase včetně kódu, ať jde přesně určit příčina.
-    const e = new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
-    (e as Error & { code?: string }).code = error.code;
-    throw e;
-  }
+  if (error)
+    throwSafeDatabaseError(
+      "urad-api.createCase",
+      error,
+      "Případ se nepodařilo vytvořit. Zkontrolujte údaje a zkuste to prosím znovu.",
+    );
   return mapCase(data as unknown as Record<string, unknown>);
 }
 
@@ -231,7 +251,12 @@ export async function listSteps(caseId: string): Promise<CaseStep[]> {
     .eq(s.caseId, caseId)
     .order(s.createdAt, { ascending: true })
     .order(s.id, { ascending: true });
-  if (error) throw new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
+  if (error)
+    throwSafeDatabaseError(
+      "urad-api.listSteps",
+      error,
+      "Historii případu se nepodařilo načíst. Zkuste to prosím znovu.",
+    );
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     id: String(r[s.id]),
     kind: r[s.kind] as CaseStep["kind"],
@@ -247,7 +272,12 @@ export async function addUserInput(caseId: string, content: string) {
   const { error } = await getSupabase()
     .from(SCHEMA.steps.table)
     .insert({ [s.caseId]: caseId, [s.kind]: "user_input", [s.content]: content });
-  if (error) throw new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
+  if (error)
+    throwSafeDatabaseError(
+      "urad-api.addUserInput",
+      error,
+      "Odpověď se nepodařilo uložit. Zkuste to prosím znovu.",
+    );
 }
 
 /** Přístupový token aktuální session pro serverové funkce DOME. */
