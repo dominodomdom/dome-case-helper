@@ -27,7 +27,10 @@ async function loadCaseContext(caseId: string, accessToken: string) {
     .eq(c.id, caseId)
     .maybeSingle();
   if (kase.error) {
-    console.error("dome.loadCaseContext.case", { code: kase.error.code, message: kase.error.message });
+    console.error("dome.loadCaseContext.case", {
+      code: kase.error.code,
+      message: kase.error.message,
+    });
     throw new DomeError("Případ se nepodařilo načíst. Zkuste to prosím znovu.");
   }
   if (!kase.data) throw new DomeError("Případ nebyl nalezen.", 404);
@@ -40,7 +43,10 @@ async function loadCaseContext(caseId: string, accessToken: string) {
     .order(s.createdAt, { ascending: true })
     .order(s.id, { ascending: true });
   if (steps.error) {
-    console.error("dome.loadCaseContext.steps", { code: steps.error.code, message: steps.error.message });
+    console.error("dome.loadCaseContext.steps", {
+      code: steps.error.code,
+      message: steps.error.message,
+    });
     throw new DomeError("Historii případu se nepodařilo načíst. Zkuste to prosím znovu.");
   }
 
@@ -249,7 +255,10 @@ export const analyzeDocument = createServerFn({ method: "POST" })
         .eq(SCHEMA.cases.columns.id, data.caseId)
         .maybeSingle();
       if (own.error) {
-        console.error("dome.analyzeDocument.case", { code: own.error.code, message: own.error.message });
+        console.error("dome.analyzeDocument.case", {
+          code: own.error.code,
+          message: own.error.message,
+        });
         throw new DomeError("Případ se nepodařilo ověřit. Zkuste to prosím znovu.");
       }
       if (!own.data) throw new DomeError("Případ nebyl nalezen.", 404);
@@ -281,7 +290,10 @@ export const analyzeDocument = createServerFn({ method: "POST" })
         [s.content]: summary.trim(),
       });
       if (ins.error) {
-        console.error("dome.analyzeDocument.insert", { code: ins.error.code, message: ins.error.message });
+        console.error("dome.analyzeDocument.insert", {
+          code: ins.error.code,
+          message: ins.error.message,
+        });
         throw new DomeError("Dokument se nepodařilo uložit. Zkuste to prosím znovu.");
       }
       return { ok: true, data: { summary } };
