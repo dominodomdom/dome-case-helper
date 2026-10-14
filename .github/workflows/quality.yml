@@ -9,7 +9,8 @@ on:
       - chore/verify-chatgpt-write-access
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: read
 
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
@@ -23,6 +24,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          persist-credentials: true
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -34,6 +38,22 @@ jobs:
 
       - name: Run unit and component tests
         run: bun run test
+
+      - name: Format D1 files
+        run: bunx prettier --write src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/case-state.test.ts
+
+      - name: Commit formatting fixes on the working branch
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/case-state.test.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style: format D1 schema and tests"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
 
       - name: Run lint
         run: bun run lint
