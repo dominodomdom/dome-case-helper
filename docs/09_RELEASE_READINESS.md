@@ -3,7 +3,7 @@
 **Verdict: NOT READY for production.** Gate status (D2): BLOCKED.
 
 ## Done (verified in this environment)
-Type check, 63/63 tests, lint 0 errors (6 fast-refresh warnings), production build, formatting,
+Type check, 69/69 tests across 9 files, lint 0 errors (6 fast-refresh warnings), production build, formatting,
 AI provider boundary, documentation, `.env.example`.
 
 ## Not done / blocking
