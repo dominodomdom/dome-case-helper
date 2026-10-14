@@ -8,9 +8,19 @@ import { enforceHandoffLabels, parseChoice, type ChoiceId } from "./dome-core";
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
 
 function fail(e: unknown): { ok: false; error: string } {
-  if (e && typeof e === "object" && "message" in e)
-    return { ok: false, error: String((e as Error).message) };
-  return { ok: false, error: "Neočekávaná chyba." };
+  // Only errors deliberately created by our server boundary may cross to the client.
+  // Supabase/provider/unknown errors can carry internal schema, query, or transport details.
+  if (
+    e &&
+    typeof e === "object" &&
+    "name" in e &&
+    e.name === "DomeError" &&
+    "message" in e &&
+    typeof e.message === "string"
+  ) {
+    return { ok: false, error: e.message };
+  }
+  return { ok: false, error: "Neočekávaná chyba. Zkuste to prosím znovu." };
 }
 
 const caseInput = z.object({ caseId: z.string().uuid(), accessToken: z.string().min(10) });

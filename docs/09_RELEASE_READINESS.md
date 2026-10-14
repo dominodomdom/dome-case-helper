@@ -11,7 +11,7 @@ AI provider boundary, documentation, `.env.example`.
 2. RLS audit of `urad_case_steps` INSERT (`01_preflight_audit.sql`).
 3. Signed-in E2E incl. two-tab conflict with the 3-param RPC.
 4. `03_deprecate_2param.sql` after 1–3.
-5. Security items S1–S3 (docs/04).
+5. S3 server-side idempotency for document/input writes (design + DB uniqueness/RPC contract; not yet implemented). S1/S2 code fixes are merged; signed-in production verification remains outstanding.
 6. Portability outside Lovable (install/build/run on a clean machine) — UNVERIFIED.
 7. No verified social-service registry / transport source (feature intentionally inert).
 
@@ -20,4 +20,4 @@ AI may rephrase the user goal; possible duplicate needs; no idempotency on step 
 JSONB case state growth (re-review before Phase 3).
 
 ## Steps to finish
-Run 1–2 and send outputs → run 3 → apply 4 → fix S1–S3 → clean-machine build → re-run gates.
+Run 1–2 and send outputs → run 3 → apply 4 → implement and verify S3 idempotency → clean-machine build → re-run gates.
