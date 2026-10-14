@@ -17,9 +17,9 @@ Server functions are CSRF-protected (`src/start.ts`).
 ## Findings
 | ID | Class | Where | Issue / impact | Fix | DB change? |
 | --- | --- | --- | --- | --- | --- |
-| S1 | CONFIRMED (low) | `dome.functions.ts`, `dome.server.ts` | Raw Postgres error messages/codes are returned to the user in Czech messages (e.g. "Případ nelze načíst: …"). Minor information disclosure. | Map to generic messages, log details server-side | No |
-| S2 | POTENTIAL | `analyzeDocument` | Ownership checked only by RLS-scoped select of the case, not by explicit `user_id` compare like other functions. Safe iff RLS restricts selects to owner (UNVERIFIED). | Add explicit owner compare | No |
-| S3 | POTENTIAL | `analyzeDocument`, `addUserInput` | No idempotency: a retry/double click can create duplicate `user_document`/`user_input` steps (and duplicate AI cost). UI disables buttons while busy. | Client request id + dedupe | Ideally yes (unique key) |
+| S1 | FIXED in code (CI verified) | `dome.functions.ts`, `dome.server.ts` | Database errors are mapped to generic Czech responses; the shared `fail()` boundary only forwards deliberately created `DomeError` messages and masks unknown errors. Server logs retain diagnostic details. | Implemented; verify with signed-in E2E | No |
+| S2 | FIXED in code (CI verified) | `analyzeDocument` | Explicitly compares the selected case owner with the authenticated user before document contents are sent to AI or a step is written. | Implemented; production RLS/E2E still needs verification | No |
+| S3 | OPEN | `analyzeDocument`, `addUserInput` | A retry/double click may create duplicate `user_document`/`user_input` steps and duplicate AI cost. UI disables buttons while busy, but that is not server-side idempotency. | Design a request-id/deduplication contract; likely requires a DB uniqueness boundary or RPC change. Do not claim fixed until retry/race tests pass. | Yes, likely; separate decision/migration required |
 | S4 | UNVERIFIED | DB RLS | Client direct insert of `dome_assessment` blocked? | Run preflight SQL | — |
 | S5 | CONFIRMED (low) | `ai-provider.server.ts` | Provider error body logged server-side (now truncated to 500 chars). No user secrets included. | — | No |
 | S6 | INFO | `urad-api.ts` | Access token is passed in the server-fn body (not a header). Over HTTPS + CSRF guard; acceptable. | Optional move to header middleware | No |
