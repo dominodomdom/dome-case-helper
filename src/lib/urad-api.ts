@@ -229,7 +229,8 @@ export async function listSteps(caseId: string): Promise<CaseStep[]> {
     .from(SCHEMA.steps.table)
     .select([s.id, s.kind, s.content, s.documentName, s.assessment, s.createdAt].join(","))
     .eq(s.caseId, caseId)
-    .order(s.createdAt, { ascending: true });
+    .order(s.createdAt, { ascending: true })
+    .order(s.id, { ascending: true });
   if (error) throw new Error(`${error.message} (kód: ${error.code ?? "neznámý"})`);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     id: String(r[s.id]),

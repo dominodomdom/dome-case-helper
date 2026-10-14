@@ -34,7 +34,8 @@ async function loadCaseContext(caseId: string, accessToken: string) {
     .from(SCHEMA.steps.table)
     .select(`${s.kind},${s.content},${s.documentName},${s.assessment},${s.createdAt}`)
     .eq(s.caseId, caseId)
-    .order(s.createdAt, { ascending: true });
+    .order(s.createdAt, { ascending: true })
+    .order(s.id, { ascending: true });
   if (steps.error) throw new DomeError(`Kroky případu nelze načíst: ${steps.error.message}`);
 
   const lines: string[] = [
@@ -107,6 +108,7 @@ async function readLatestAssessment(
     .eq(s.caseId, caseId)
     .eq(s.kind, "dome_assessment")
     .order(s.createdAt, { ascending: false })
+    .order(s.id, { ascending: false })
     .limit(1)
     .maybeSingle();
   if (r.error) throw new DomeError(`Stav případu nelze ověřit: ${r.error.message}`);
