@@ -77,6 +77,37 @@ describe("DomeCaseState schema 1.1", () => {
     expect(normalized && validateCaseState(normalized)).toEqual([]);
 
     if (normalized) {
+      normalized.timeline = [
+        {
+          id: "bad-date",
+          label: "Neexistující datum",
+          date: "2026-02-30",
+          date_status: "KNOWN",
+          source: "SYSTEM",
+          evidence_ids: [],
+        },
+      ];
+      normalized.deadlines = [
+        {
+          id: "empty-anchor",
+          label: "Lhůta bez cíle",
+          date: null,
+          date_status: "UNKNOWN",
+          source: "SYSTEM",
+          anchor_type: "PROCEDURE",
+          anchor_ref: "   ",
+          evidence_ids: [],
+        },
+      ];
+      expect(validateCaseState(normalized)).toEqual(
+        expect.arrayContaining([
+          "timeline bad-date: neplatné datum",
+          "deadline empty-anchor: prázdná vazba anchor",
+        ]),
+      );
+
+      normalized.timeline = [];
+      normalized.deadlines = [];
       normalized.evidence_links = [
         {
           id: "broken-link",
