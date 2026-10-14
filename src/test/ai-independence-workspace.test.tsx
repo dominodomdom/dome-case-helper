@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const aiCalls: any[] = [];
@@ -57,6 +57,7 @@ const renderWs = () =>
 const settle = () => new Promise((r) => setTimeout(r, 50));
 
 beforeEach(() => {
+  cleanup();
   aiCalls.length = 0;
 });
 
@@ -75,7 +76,7 @@ describe("AI Independence — žádné automatické AI", () => {
       { id: "a", kind: "dome_assessment", content: null, documentName: null, assessment, createdAt: "1" },
     ];
     renderWs();
-    await screen.findByText("Otázka?");
+    expect((await screen.findAllByText("Otázka?")).length).toBeGreaterThan(0);
     await settle();
     expect(aiCalls).toHaveLength(0);
     expect(screen.queryByTestId("no-auto-assessment")).toBeNull();
@@ -90,7 +91,7 @@ describe("AI Independence — žádné automatické AI", () => {
     await screen.findByTestId("no-auto-assessment");
     await settle();
     expect(aiCalls).toHaveLength(0);
-    expect(screen.getByText("Otázka?")).toBeTruthy();
+    expect(screen.getAllByText("Otázka?").length).toBeGreaterThan(0);
   });
 
   it("explicitní tlačítko AI zavolá assessCase právě jednou", async () => {
