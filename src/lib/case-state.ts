@@ -640,7 +640,11 @@ export function buildCaseState(input: {
     evidence_links: (prev?.evidence_links ?? []).map((x) => ({ ...x })),
     timeline: (prev?.timeline ?? []).map((x) => ({ ...x, evidence_ids: [...x.evidence_ids] })),
     deadlines: (prev?.deadlines ?? []).map((x) => ({ ...x, evidence_ids: [...x.evidence_ids] })),
-    risks: (prev?.risks ?? []).map((x) => ({ ...x, related_need_ids: [...x.related_need_ids], evidence_ids: [...x.evidence_ids] })),
+    risks: (prev?.risks ?? []).map((x) => ({
+      ...x,
+      related_need_ids: [...x.related_need_ids],
+      evidence_ids: [...x.evidence_ids],
+    })),
     metadata: {
       last_updated: now,
       version: (prev?.metadata.version ?? 0) + 1,
@@ -750,7 +754,9 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if (!EVIDENCE_KINDS.includes(x.kind)) e.push(`evidence ${x.id}: kind`);
     if (!x.ref.trim()) e.push(`evidence ${x.id}: chybí reference`);
     if (!REALITY_SOURCES.includes(x.source)) e.push(`evidence ${x.id}: source`);
-    x.reality_ids.forEach((id) => !realityIds.has(id) && e.push(`evidence ${x.id}: neznámá reality ${id}`));
+    x.reality_ids.forEach(
+      (id) => !realityIds.has(id) && e.push(`evidence ${x.id}: neznámá reality ${id}`),
+    );
   });
   evidenceLinks.forEach((x) => {
     uniq(x.id);
@@ -764,7 +770,9 @@ export function validateCaseState(s: DomeCaseState): string[] {
     if ((x.date === null) !== (x.date_status === "UNKNOWN"))
       e.push(`timeline ${x.id}: date_status`);
     if (!REALITY_SOURCES.includes(x.source)) e.push(`timeline ${x.id}: source`);
-    x.evidence_ids.forEach((id) => !evidenceIds.has(id) && e.push(`timeline ${x.id}: neznámá evidence ${id}`));
+    x.evidence_ids.forEach(
+      (id) => !evidenceIds.has(id) && e.push(`timeline ${x.id}: neznámá evidence ${id}`),
+    );
   });
   deadlines.forEach((x) => {
     uniq(x.id);
@@ -775,15 +783,22 @@ export function validateCaseState(s: DomeCaseState): string[] {
       e.push(`deadline ${x.id}: neúplná vazba anchor`);
     if (x.anchor_type && !DEADLINE_ANCHORS.includes(x.anchor_type))
       e.push(`deadline ${x.id}: anchor_type`);
-    x.evidence_ids.forEach((id) => !evidenceIds.has(id) && e.push(`deadline ${x.id}: neznámá evidence ${id}`));
+    x.evidence_ids.forEach(
+      (id) => !evidenceIds.has(id) && e.push(`deadline ${x.id}: neznámá evidence ${id}`),
+    );
   });
   risks.forEach((x) => {
     uniq(x.id);
     if (!["HIGH", "MEDIUM", "LOW", "UNKNOWN"].includes(x.level)) e.push(`risk ${x.id}: level`);
-    if (!["OPEN", "MITIGATED", "RESOLVED", "UNKNOWN"].includes(x.status)) e.push(`risk ${x.id}: status`);
+    if (!["OPEN", "MITIGATED", "RESOLVED", "UNKNOWN"].includes(x.status))
+      e.push(`risk ${x.id}: status`);
     if (!REALITY_SOURCES.includes(x.source)) e.push(`risk ${x.id}: source`);
-    x.related_need_ids.forEach((id) => !needIds.has(id) && e.push(`risk ${x.id}: neznámá potřeba ${id}`));
-    x.evidence_ids.forEach((id) => !evidenceIds.has(id) && e.push(`risk ${x.id}: neznámá evidence ${id}`));
+    x.related_need_ids.forEach(
+      (id) => !needIds.has(id) && e.push(`risk ${x.id}: neznámá potřeba ${id}`),
+    );
+    x.evidence_ids.forEach(
+      (id) => !evidenceIds.has(id) && e.push(`risk ${x.id}: neznámá evidence ${id}`),
+    );
   });
   return e;
 }
@@ -847,10 +862,18 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
     const cs = a["case_state"] as DomeCaseState | undefined;
     if (
       cs &&
-      LEGACY_DOME_CASE_SCHEMA_VERSIONS.includes(cs.dome_case_schema_version as (typeof LEGACY_DOME_CASE_SCHEMA_VERSIONS)[number]) &&
+      LEGACY_DOME_CASE_SCHEMA_VERSIONS.includes(
+        cs.dome_case_schema_version as (typeof LEGACY_DOME_CASE_SCHEMA_VERSIONS)[number],
+      ) &&
       Array.isArray(cs.actions)
     ) {
-      const legacyLinks = cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] };
+      const legacyLinks = cs.links ?? {
+        routes: [],
+        evidence: [],
+        deadlines: [],
+        risks: [],
+        gaps: [],
+      };
       const legacyEvidence = Array.isArray(legacyLinks.evidence) ? legacyLinks.evidence : [];
       const legacyDeadlines = Array.isArray(legacyLinks.deadlines) ? legacyLinks.deadlines : [];
       const legacyRisks = Array.isArray(legacyLinks.risks) ? legacyLinks.risks : [];
@@ -858,35 +881,41 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
         ...cs,
         dome_case_schema_version: DOME_CASE_SCHEMA_VERSION,
         documents: Array.isArray(cs.documents) ? cs.documents : [],
-        evidence: Array.isArray(cs.evidence) ? cs.evidence : legacyEvidence.map((x) => ({
-          id: x.id,
-          kind: "OTHER_VERIFIABLE_SOURCE" as const,
-          ref: x.id,
-          source: x.source,
-          verified: false,
-          reality_ids: Array.isArray(x.reality_ids) ? x.reality_ids : [],
-        })),
+        evidence: Array.isArray(cs.evidence)
+          ? cs.evidence
+          : legacyEvidence.map((x) => ({
+              id: x.id,
+              kind: "OTHER_VERIFIABLE_SOURCE" as const,
+              ref: x.id,
+              source: x.source,
+              verified: false,
+              reality_ids: Array.isArray(x.reality_ids) ? x.reality_ids : [],
+            })),
         evidence_links: Array.isArray(cs.evidence_links) ? cs.evidence_links : [],
         timeline: Array.isArray(cs.timeline) ? cs.timeline : [],
-        deadlines: Array.isArray(cs.deadlines) ? cs.deadlines : legacyDeadlines.map((x) => ({
-          id: x.id,
-          label: x.label,
-          date: x.date ?? null,
-          date_status: x.date ? "KNOWN" as const : "UNKNOWN" as const,
-          source: x.source,
-          anchor_type: null,
-          anchor_ref: null,
-          evidence_ids: [],
-        })),
-        risks: Array.isArray(cs.risks) ? cs.risks : legacyRisks.map((x) => ({
-          id: x.id,
-          label: x.label,
-          level: "UNKNOWN" as const,
-          status: "UNKNOWN" as const,
-          source: "SYSTEM" as const,
-          related_need_ids: [],
-          evidence_ids: [],
-        })),
+        deadlines: Array.isArray(cs.deadlines)
+          ? cs.deadlines
+          : legacyDeadlines.map((x) => ({
+              id: x.id,
+              label: x.label,
+              date: x.date ?? null,
+              date_status: x.date ? ("KNOWN" as const) : ("UNKNOWN" as const),
+              source: x.source,
+              anchor_type: null,
+              anchor_ref: null,
+              evidence_ids: [],
+            })),
+        risks: Array.isArray(cs.risks)
+          ? cs.risks
+          : legacyRisks.map((x) => ({
+              id: x.id,
+              label: x.label,
+              level: "UNKNOWN" as const,
+              status: "UNKNOWN" as const,
+              source: "SYSTEM" as const,
+              related_need_ids: [],
+              evidence_ids: [],
+            })),
         person: { ...emptyPerson(), ...(cs.person ?? {}) },
         links: legacyLinks,
         unknowns: cs.unknowns ?? [],

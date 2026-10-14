@@ -73,7 +73,14 @@ describe("AI Independence — žádné automatické AI", () => {
 
   it("případ s posledním assessmentem: AI se nevolá a uložený stav se zobrazí", async () => {
     steps = [
-      { id: "a", kind: "dome_assessment", content: null, documentName: null, assessment, createdAt: "1" },
+      {
+        id: "a",
+        kind: "dome_assessment",
+        content: null,
+        documentName: null,
+        assessment,
+        createdAt: "1",
+      },
     ];
     renderWs();
     expect((await screen.findAllByText("Otázka?")).length).toBeGreaterThan(0);
@@ -84,8 +91,22 @@ describe("AI Independence — žádné automatické AI", () => {
 
   it("historie končící odpovědí uživatele: AI se nevolá, uložený stav zůstává", async () => {
     steps = [
-      { id: "a", kind: "dome_assessment", content: null, documentName: null, assessment, createdAt: "1" },
-      { id: "b", kind: "user_input", content: "odpověď", documentName: null, assessment: null, createdAt: "2" },
+      {
+        id: "a",
+        kind: "dome_assessment",
+        content: null,
+        documentName: null,
+        assessment,
+        createdAt: "1",
+      },
+      {
+        id: "b",
+        kind: "user_input",
+        content: "odpověď",
+        documentName: null,
+        assessment: null,
+        createdAt: "2",
+      },
     ];
     renderWs();
     await screen.findByTestId("no-auto-assessment");
@@ -99,6 +120,9 @@ describe("AI Independence — žádné automatické AI", () => {
     renderWs();
     fireEvent.click(await screen.findByRole("button", { name: /Spustit AI rozbor/ }));
     await waitFor(() => expect(aiCalls).toHaveLength(1));
-    expect(aiCalls[0]).toEqual({ fn: "assessCase", data: { caseId: ID, accessToken: "token-xxxxxxxxxx" } });
+    expect(aiCalls[0]).toEqual({
+      fn: "assessCase",
+      data: { caseId: ID, accessToken: "token-xxxxxxxxxx" },
+    });
   });
 });

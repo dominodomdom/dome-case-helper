@@ -19,10 +19,20 @@ describe("DomeCaseState schema 1.1", () => {
         links: {
           routes: [],
           evidence: [
-            { id: "old-evidence", label: "Doklad zmíněný ve starém stavu", source: "DOCUMENT", reality_ids: [] },
+            {
+              id: "old-evidence",
+              label: "Doklad zmíněný ve starém stavu",
+              source: "DOCUMENT",
+              reality_ids: [],
+            },
           ],
           deadlines: [
-            { id: "old-deadline", label: "Lhůta uvedená ve starém stavu", date: null, source: "DOCUMENT" },
+            {
+              id: "old-deadline",
+              label: "Lhůta uvedená ve starém stavu",
+              date: null,
+              source: "DOCUMENT",
+            },
           ],
           risks: [{ id: "old-risk", label: "Dříve zaznamenané riziko" }],
           gaps: [],
@@ -67,31 +77,39 @@ describe("DomeCaseState schema 1.1", () => {
     expect(normalized && validateCaseState(normalized)).toEqual([]);
 
     if (normalized) {
-      normalized.evidence_links = [{
-        id: "broken-link",
-        evidence_id: "missing-evidence",
-        reality_id: "missing-reality",
-        relation: "SUPPORTS",
-      }];
-      expect(validateCaseState(normalized)).toEqual(expect.arrayContaining([
-        "evidence_link broken-link: neznámá evidence",
-        "evidence_link broken-link: neznámá reality",
-      ]));
+      normalized.evidence_links = [
+        {
+          id: "broken-link",
+          evidence_id: "missing-evidence",
+          reality_id: "missing-reality",
+          relation: "SUPPORTS",
+        },
+      ];
+      expect(validateCaseState(normalized)).toEqual(
+        expect.arrayContaining([
+          "evidence_link broken-link: neznámá evidence",
+          "evidence_link broken-link: neznámá reality",
+        ]),
+      );
 
-      normalized.deadlines = [{
-        id: "bad-deadline",
-        label: "Neplatný termín",
-        date: null,
-        date_status: "KNOWN",
-        source: "SYSTEM",
-        anchor_type: "NEED",
-        anchor_ref: null,
-        evidence_ids: [],
-      }];
-      expect(validateCaseState(normalized)).toEqual(expect.arrayContaining([
-        "deadline bad-deadline: date_status",
-        "deadline bad-deadline: neúplná vazba anchor",
-      ]));
+      normalized.deadlines = [
+        {
+          id: "bad-deadline",
+          label: "Neplatný termín",
+          date: null,
+          date_status: "KNOWN",
+          source: "SYSTEM",
+          anchor_type: "NEED",
+          anchor_ref: null,
+          evidence_ids: [],
+        },
+      ];
+      expect(validateCaseState(normalized)).toEqual(
+        expect.arrayContaining([
+          "deadline bad-deadline: date_status",
+          "deadline bad-deadline: neúplná vazba anchor",
+        ]),
+      );
     }
   });
 
@@ -110,7 +128,12 @@ describe("DomeCaseState schema 1.1", () => {
         actions: [],
         unknowns: [],
         links: { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] },
-        metadata: { last_updated: "2026-01-01T00:00:00.000Z", version: 1, legacy_normalized: false, signals: [] },
+        metadata: {
+          last_updated: "2026-01-01T00:00:00.000Z",
+          version: 1,
+          legacy_normalized: false,
+          signals: [],
+        },
       },
     };
 
