@@ -1,12 +1,13 @@
 /**
- * CASE CORE — canonical DomeCaseState (schema 1.0).
+ * CASE CORE — canonical DomeCaseState (schema 1.1).
  * Jediný datový kontrakt analytického stavu případu. Ukládá se uvnitř assessment JSONB
  * (urad_case_steps) přes urad_record_dome_assessment — žádné nové tabulky.
  * Čistý modul: sdílí ho server (stavba, validace) i UI (typy, normalizace starých hodnocení).
  */
 import { detectImmediateNeeds, type NeedSignal } from "./support-engine";
 
-export const DOME_CASE_SCHEMA_VERSION = "1.0";
+export const DOME_CASE_SCHEMA_VERSION = "1.1";
+export const LEGACY_DOME_CASE_SCHEMA_VERSIONS = ["1.0", "1.1"] as const;
 
 /* ---------- Enumy ---------- */
 export const REALITY_TYPES = ["FACT", "CLAIM", "INTERPRETATION", "VERIFICATION"] as const;
@@ -174,6 +175,56 @@ export type FutureLinks = {
   gaps: { id: string; route_id: string | null; label: string }[];
 };
 
+/** Additive v1.1 entities. These are descriptive records, not verification by themselves. */
+export type CaseDocument = {
+  id: string;
+  name: string;
+  source: RealitySource;
+  uploaded_at: string | null;
+  extraction_status: "UNKNOWN" | "PENDING" | "SUCCEEDED" | "FAILED";
+};
+export type CaseEvidence = {
+  id: string;
+  kind: EvidenceKind;
+  ref: string;
+  source: RealitySource;
+  verified: boolean;
+  reality_ids: string[];
+};
+export type CaseEvidenceLink = {
+  id: string;
+  evidence_id: string;
+  reality_id: string;
+  relation: "SUPPORTS" | "CONTRADICTS" | "MENTIONS";
+};
+export type CaseTimelineEvent = {
+  id: string;
+  label: string;
+  date: string | null;
+  date_status: "KNOWN" | "UNKNOWN";
+  source: RealitySource;
+  evidence_ids: string[];
+};
+export type CaseDeadline = {
+  id: string;
+  label: string;
+  date: string | null;
+  date_status: "KNOWN" | "UNKNOWN";
+  source: RealitySource;
+  anchor_type: DeadlineAnchorType | null;
+  anchor_ref: string | null;
+  evidence_ids: string[];
+};
+export type CaseRisk = {
+  id: string;
+  label: string;
+  level: "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
+  status: "OPEN" | "MITIGATED" | "RESOLVED" | "UNKNOWN";
+  source: RealitySource;
+  related_need_ids: string[];
+  evidence_ids: string[];
+};
+
 export type DomeCaseState = {
   dome_case_schema_version: typeof DOME_CASE_SCHEMA_VERSION;
   case_id: string;
@@ -187,6 +238,13 @@ export type DomeCaseState = {
   actions: Action[];
   unknowns: Unknown[];
   links: FutureLinks;
+  /** Schema 1.1 additions. Optional to read historic v1.0 payloads safely. */
+  documents?: CaseDocument[];
+  evidence?: CaseEvidence[];
+  evidence_links?: CaseEvidenceLink[];
+  timeline?: CaseTimelineEvent[];
+  deadlines?: CaseDeadline[];
+  risks?: CaseRisk[];
   metadata: {
     last_updated: string;
     version: number;
@@ -577,6 +635,12 @@ export function buildCaseState(input: {
     actions,
     unknowns,
     links,
+    documents: (prev?.documents ?? []).map((x) => ({ ...x })),
+    evidence: (prev?.evidence ?? []).map((x) => ({ ...x, reality_ids: [...x.reality_ids] })),
+    evidence_links: (prev?.evidence_links ?? []).map((x) => ({ ...x })),
+    timeline: (prev?.timeline ?? []).map((x) => ({ ...x, evidence_ids: [...x.evidence_ids] })),
+    deadlines: (prev?.deadlines ?? []).map((x) => ({ ...x, evidence_ids: [...x.evidence_ids] })),
+    risks: (prev?.risks ?? []).map((x) => ({ ...x, related_need_ids: [...x.related_need_ids], evidence_ids: [...x.evidence_ids] })),
     metadata: {
       last_updated: now,
       version: (prev?.metadata.version ?? 0) + 1,
@@ -726,13 +790,48 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
     const cs = a["case_state"] as DomeCaseState | undefined;
     if (
       cs &&
-      cs.dome_case_schema_version === DOME_CASE_SCHEMA_VERSION &&
+      LEGACY_DOME_CASE_SCHEMA_VERSIONS.includes(cs.dome_case_schema_version as (typeof LEGACY_DOME_CASE_SCHEMA_VERSIONS)[number]) &&
       Array.isArray(cs.actions)
     ) {
+      const legacyLinks = cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] };
+      const legacyEvidence = Array.isArray(legacyLinks.evidence) ? legacyLinks.evidence : [];
+      const legacyDeadlines = Array.isArray(legacyLinks.deadlines) ? legacyLinks.deadlines : [];
+      const legacyRisks = Array.isArray(legacyLinks.risks) ? legacyLinks.risks : [];
       return {
         ...cs,
+        dome_case_schema_version: DOME_CASE_SCHEMA_VERSION,
+        documents: Array.isArray(cs.documents) ? cs.documents : [],
+        evidence: Array.isArray(cs.evidence) ? cs.evidence : legacyEvidence.map((x) => ({
+          id: x.id,
+          kind: "OTHER_VERIFIABLE_SOURCE" as const,
+          ref: x.id,
+          source: x.source,
+          verified: false,
+          reality_ids: Array.isArray(x.reality_ids) ? x.reality_ids : [],
+        })),
+        evidence_links: Array.isArray(cs.evidence_links) ? cs.evidence_links : [],
+        timeline: Array.isArray(cs.timeline) ? cs.timeline : [],
+        deadlines: Array.isArray(cs.deadlines) ? cs.deadlines : legacyDeadlines.map((x) => ({
+          id: x.id,
+          label: x.label,
+          date: x.date ?? null,
+          date_status: x.date ? "KNOWN" as const : "UNKNOWN" as const,
+          source: x.source,
+          anchor_type: null,
+          anchor_ref: null,
+          evidence_ids: [],
+        })),
+        risks: Array.isArray(cs.risks) ? cs.risks : legacyRisks.map((x) => ({
+          id: x.id,
+          label: x.label,
+          level: "UNKNOWN" as const,
+          status: "UNKNOWN" as const,
+          source: "SYSTEM" as const,
+          related_need_ids: [],
+          evidence_ids: [],
+        })),
         person: { ...emptyPerson(), ...(cs.person ?? {}) },
-        links: cs.links ?? { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] },
+        links: legacyLinks,
         unknowns: cs.unknowns ?? [],
         reality: cs.reality ?? [],
         needs: (cs.needs ?? []).map(normalizeNeed),
@@ -793,6 +892,12 @@ export function normalizeCaseState(assessment: unknown, caseId: string): DomeCas
         impact: "MEDIUM" as const,
       })),
       links: { routes: [], evidence: [], deadlines: [], risks: [], gaps: [] },
+      documents: [],
+      evidence: [],
+      evidence_links: [],
+      timeline: [],
+      deadlines: [],
+      risks: [],
       metadata: { last_updated: t, version: 0, legacy_normalized: true, signals: [] },
     };
   } catch {
