@@ -728,6 +728,63 @@ export function validateCaseState(s: DomeCaseState): string[] {
     uniq(u.id);
     if (!u.why_it_matters) e.push(`unknown ${u.id}: chybí důvod`);
   });
+
+  // Schema 1.1: additive collections are optional for historic in-memory callers.
+  const documents = s.documents ?? [];
+  const evidence = s.evidence ?? [];
+  const evidenceLinks = s.evidence_links ?? [];
+  const timeline = s.timeline ?? [];
+  const deadlines = s.deadlines ?? [];
+  const risks = s.risks ?? [];
+  const evidenceIds = new Set(evidence.map((x) => x.id));
+  const realityIds = new Set(s.reality.map((x) => x.id));
+  documents.forEach((d) => {
+    uniq(d.id);
+    if (!d.name.trim()) e.push(`document ${d.id}: chybí název`);
+    if (!REALITY_SOURCES.includes(d.source)) e.push(`document ${d.id}: source`);
+    if (!["UNKNOWN", "PENDING", "SUCCEEDED", "FAILED"].includes(d.extraction_status))
+      e.push(`document ${d.id}: extraction_status`);
+  });
+  evidence.forEach((x) => {
+    uniq(x.id);
+    if (!EVIDENCE_KINDS.includes(x.kind)) e.push(`evidence ${x.id}: kind`);
+    if (!x.ref.trim()) e.push(`evidence ${x.id}: chybí reference`);
+    if (!REALITY_SOURCES.includes(x.source)) e.push(`evidence ${x.id}: source`);
+    x.reality_ids.forEach((id) => !realityIds.has(id) && e.push(`evidence ${x.id}: neznámá reality ${id}`));
+  });
+  evidenceLinks.forEach((x) => {
+    uniq(x.id);
+    if (!evidenceIds.has(x.evidence_id)) e.push(`evidence_link ${x.id}: neznámá evidence`);
+    if (!realityIds.has(x.reality_id)) e.push(`evidence_link ${x.id}: neznámá reality`);
+    if (!["SUPPORTS", "CONTRADICTS", "MENTIONS"].includes(x.relation))
+      e.push(`evidence_link ${x.id}: relation`);
+  });
+  timeline.forEach((x) => {
+    uniq(x.id);
+    if ((x.date === null) !== (x.date_status === "UNKNOWN"))
+      e.push(`timeline ${x.id}: date_status`);
+    if (!REALITY_SOURCES.includes(x.source)) e.push(`timeline ${x.id}: source`);
+    x.evidence_ids.forEach((id) => !evidenceIds.has(id) && e.push(`timeline ${x.id}: neznámá evidence ${id}`));
+  });
+  deadlines.forEach((x) => {
+    uniq(x.id);
+    if ((x.date === null) !== (x.date_status === "UNKNOWN"))
+      e.push(`deadline ${x.id}: date_status`);
+    if (!REALITY_SOURCES.includes(x.source)) e.push(`deadline ${x.id}: source`);
+    if ((x.anchor_type === null) !== (x.anchor_ref === null))
+      e.push(`deadline ${x.id}: neúplná vazba anchor`);
+    if (x.anchor_type && !DEADLINE_ANCHORS.includes(x.anchor_type))
+      e.push(`deadline ${x.id}: anchor_type`);
+    x.evidence_ids.forEach((id) => !evidenceIds.has(id) && e.push(`deadline ${x.id}: neznámá evidence ${id}`));
+  });
+  risks.forEach((x) => {
+    uniq(x.id);
+    if (!["HIGH", "MEDIUM", "LOW", "UNKNOWN"].includes(x.level)) e.push(`risk ${x.id}: level`);
+    if (!["OPEN", "MITIGATED", "RESOLVED", "UNKNOWN"].includes(x.status)) e.push(`risk ${x.id}: status`);
+    if (!REALITY_SOURCES.includes(x.source)) e.push(`risk ${x.id}: source`);
+    x.related_need_ids.forEach((id) => !needIds.has(id) && e.push(`risk ${x.id}: neznámá potřeba ${id}`));
+    x.evidence_ids.forEach((id) => !evidenceIds.has(id) && e.push(`risk ${x.id}: neznámá evidence ${id}`));
+  });
   return e;
 }
 
