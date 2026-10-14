@@ -17,11 +17,11 @@ Server functions are CSRF-protected (`src/start.ts`).
 ## Findings
 | ID | Class | Where | Issue / impact | Fix | DB change? |
 | --- | --- | --- | --- | --- | --- |
-| S1 | FIXED in code (CI verified) | `dome.functions.ts`, `dome.server.ts` | Database errors are mapped to generic Czech responses; the shared `fail()` boundary only forwards deliberately created `DomeError` messages and masks unknown errors. Server logs retain diagnostic details. | Implemented; verify with signed-in E2E | No |
+| S1 | FIXED in code (CI verified) | `dome.functions.ts`, `dome.server.ts`, `urad-api.ts` | Server and client data-access paths map database failures to generic Czech responses; raw Postgres/PostgREST messages are not intended to reach the UI. Server logs retain limited diagnostics (operation + error code where applicable). | Merged in PR #2 and PR #5; verify with signed-in E2E | No |
 | S2 | FIXED in code (CI verified) | `analyzeDocument` | Explicitly compares the selected case owner with the authenticated user before document contents are sent to AI or a step is written. | Implemented; production RLS/E2E still needs verification | No |
 | S3 | OPEN | `analyzeDocument`, `addUserInput` | A retry/double click may create duplicate `user_document`/`user_input` steps and duplicate AI cost. UI disables buttons while busy, but that is not server-side idempotency. | Design a request-id/deduplication contract; likely requires a DB uniqueness boundary or RPC change. Do not claim fixed until retry/race tests pass. | Yes, likely; separate decision/migration required |
 | S4 | UNVERIFIED | DB RLS | Client direct insert of `dome_assessment` blocked? | Run preflight SQL | — |
 | S5 | CONFIRMED (low) | `ai-provider.server.ts` | Provider error body logged server-side (now truncated to 500 chars). No user secrets included. | — | No |
 | S6 | INFO | `urad-api.ts` | Access token is passed in the server-fn body (not a header). Over HTTPS + CSRF guard; acceptable. | Optional move to header middleware | No |
 
-S1–S3 were documented, not changed in this pass, to avoid altering user-visible contracts.
+S1 and S2 are implemented and merged; the corresponding GitHub Actions pipelines passed tests, lint, typecheck and production build. Signed-in production/RLS verification remains outstanding. S3 remains open because a robust server-side idempotency boundary likely changes database uniqueness/RPC contracts and needs a separately reviewed design.

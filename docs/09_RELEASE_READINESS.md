@@ -3,6 +3,8 @@
 **Verdict: NOT READY for production.** Gate status (D2): BLOCKED.
 
 ## Done (verified in this environment)
+
+Latest security code fixes: PR #2 (explicit document-case ownership check and server error sanitization) and PR #5 (client data-access error sanitization) are merged. Their relevant GitHub Actions runs passed unit/component tests (69/69), lint, TypeScript check and production build. This does not substitute for signed-in production E2E or live RLS isolation tests.
 Type check, 69/69 tests across 9 files, lint 0 errors (6 fast-refresh warnings), production build, formatting,
 AI provider boundary, documentation, `.env.example`.
 
@@ -11,7 +13,7 @@ AI provider boundary, documentation, `.env.example`.
 2. RLS audit of `urad_case_steps` INSERT (`01_preflight_audit.sql`).
 3. Signed-in E2E incl. two-tab conflict with the 3-param RPC.
 4. `03_deprecate_2param.sql` after 1–3.
-5. S3 server-side idempotency for document/input writes (design + DB uniqueness/RPC contract; not yet implemented). S1/S2 code fixes are merged; signed-in production verification remains outstanding.
+5. S3 server-side idempotency for document/input writes (design + DB uniqueness/RPC contract; not yet implemented). S1/S2 and client-side database-error sanitization are merged; signed-in production verification remains outstanding.
 6. Portability outside Lovable (install/build/run on a clean machine) — UNVERIFIED.
 7. No verified social-service registry / transport source (feature intentionally inert).
 
