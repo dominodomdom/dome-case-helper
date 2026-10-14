@@ -769,6 +769,8 @@ export function validateCaseState(s: DomeCaseState): string[] {
     uniq(x.id);
     if ((x.date === null) !== (x.date_status === "UNKNOWN"))
       e.push(`timeline ${x.id}: date_status`);
+    if (x.date !== null && !isValidCalendarDate(x.date))
+      e.push(`timeline ${x.id}: neplatné datum`);
     if (!REALITY_SOURCES.includes(x.source)) e.push(`timeline ${x.id}: source`);
     x.evidence_ids.forEach(
       (id) => !evidenceIds.has(id) && e.push(`timeline ${x.id}: neznámá evidence ${id}`),
@@ -778,9 +780,13 @@ export function validateCaseState(s: DomeCaseState): string[] {
     uniq(x.id);
     if ((x.date === null) !== (x.date_status === "UNKNOWN"))
       e.push(`deadline ${x.id}: date_status`);
+    if (x.date !== null && !isValidCalendarDate(x.date))
+      e.push(`deadline ${x.id}: neplatné datum`);
     if (!REALITY_SOURCES.includes(x.source)) e.push(`deadline ${x.id}: source`);
     if ((x.anchor_type === null) !== (x.anchor_ref === null))
       e.push(`deadline ${x.id}: neúplná vazba anchor`);
+    if (x.anchor_type !== null && !x.anchor_ref?.trim())
+      e.push(`deadline ${x.id}: prázdná vazba anchor`);
     if (x.anchor_type && !DEADLINE_ANCHORS.includes(x.anchor_type))
       e.push(`deadline ${x.id}: anchor_type`);
     x.evidence_ids.forEach(
@@ -801,6 +807,18 @@ export function validateCaseState(s: DomeCaseState): string[] {
     );
   });
   return e;
+}
+
+/** Přijímá pouze skutečné kalendářní datum ve formátu YYYY-MM-DD. */
+function isValidCalendarDate(value: string): boolean {
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year!, month! - 1, day!));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month! - 1 &&
+    date.getUTCDate() === day
+  );
 }
 
 function hasCycle(actions: Action[]): boolean {
