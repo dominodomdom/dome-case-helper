@@ -156,7 +156,7 @@ describe("CASE CORE", () => {
   it("testovací scénář: needs, tracks, akce ve všech vrstvách, platná struktura", () => {
     const s = build();
     expect(validateCaseState(s)).toEqual([]);
-    expect(s.dome_case_schema_version).toBe("1.0");
+    expect(s.dome_case_schema_version).toBe("1.1");
     expect(s.metadata.version).toBe(1);
     expect(s.tracks.map((t) => t.type)).toEqual(
       expect.arrayContaining(["SURVIVAL", "ADMINISTRATIVE", "HOUSING", "INCOME"]),
