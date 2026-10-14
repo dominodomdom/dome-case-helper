@@ -127,7 +127,11 @@ export async function listCases(): Promise<UradCase[]> {
     .select(CASE_SELECT)
     .order(c.createdAt, { ascending: false });
   if (error)
-    throwSafeDatabaseError("urad-api.listCases", error, "Seznam případů se nepodařilo načíst. Zkuste to prosím znovu.");
+    throwSafeDatabaseError(
+      "urad-api.listCases",
+      error,
+      "Seznam případů se nepodařilo načíst. Zkuste to prosím znovu.",
+    );
   return (data ?? []).map((row) => mapCase(row as unknown as Record<string, unknown>));
 }
 
@@ -138,7 +142,11 @@ export async function getCase(id: string): Promise<UradCase | null> {
     .eq(c.id, id)
     .maybeSingle();
   if (error)
-    throwSafeDatabaseError("urad-api.getCase", error, "Případ se nepodařilo načíst. Zkuste to prosím znovu.");
+    throwSafeDatabaseError(
+      "urad-api.getCase",
+      error,
+      "Případ se nepodařilo načíst. Zkuste to prosím znovu.",
+    );
   return data ? mapCase(data as unknown as Record<string, unknown>) : null;
 }
 
@@ -245,7 +253,11 @@ export async function listSteps(caseId: string): Promise<CaseStep[]> {
     .order(s.createdAt, { ascending: true })
     .order(s.id, { ascending: true });
   if (error)
-    throwSafeDatabaseError("urad-api.listSteps", error, "Historii případu se nepodařilo načíst. Zkuste to prosím znovu.");
+    throwSafeDatabaseError(
+      "urad-api.listSteps",
+      error,
+      "Historii případu se nepodařilo načíst. Zkuste to prosím znovu.",
+    );
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
     id: String(r[s.id]),
     kind: r[s.kind] as CaseStep["kind"],
@@ -262,7 +274,11 @@ export async function addUserInput(caseId: string, content: string) {
     .from(SCHEMA.steps.table)
     .insert({ [s.caseId]: caseId, [s.kind]: "user_input", [s.content]: content });
   if (error)
-    throwSafeDatabaseError("urad-api.addUserInput", error, "Odpověď se nepodařilo uložit. Zkuste to prosím znovu.");
+    throwSafeDatabaseError(
+      "urad-api.addUserInput",
+      error,
+      "Odpověď se nepodařilo uložit. Zkuste to prosím znovu.",
+    );
 }
 
 /** Přístupový token aktuální session pro serverové funkce DOME. */
