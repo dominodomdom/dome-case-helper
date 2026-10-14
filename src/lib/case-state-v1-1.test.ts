@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DOME_CASE_SCHEMA_VERSION, normalizeCaseState } from "./case-state";
+import { DOME_CASE_SCHEMA_VERSION, normalizeCaseState, validateCaseState } from "./case-state";
 
 describe("DomeCaseState schema 1.1", () => {
   it("normalizes a v1.0 state additively without promoting legacy links to verified evidence", () => {
@@ -64,6 +64,20 @@ describe("DomeCaseState schema 1.1", () => {
       status: "UNKNOWN",
       evidence_ids: [],
     });
+    expect(normalized && validateCaseState(normalized)).toEqual([]);
+
+    if (normalized) {
+      normalized.evidence_links = [{
+        id: "broken-link",
+        evidence_id: "missing-evidence",
+        reality_id: "missing-reality",
+        relation: "SUPPORTS",
+      }];
+      expect(validateCaseState(normalized)).toEqual(expect.arrayContaining([
+        "evidence_link broken-link: neznámá evidence",
+        "evidence_link broken-link: neznámá reality",
+      ]));
+    }
   });
 
   it("fills absent v1.1 collections with empty arrays", () => {
