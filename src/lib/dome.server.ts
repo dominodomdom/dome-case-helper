@@ -83,9 +83,7 @@ export async function recordAssessment(
   if (rec.error) {
     if (isConcurrencyConflict(rec.error)) throw new DomeError(CONCURRENCY_CONFLICT_MESSAGE, 409);
     console.error("urad_record_dome_assessment", rec.error);
-    throw new DomeError(
-      `Hodnocení se nepodařilo uložit: ${rec.error.message} (kód: ${rec.error.code ?? "?"})`,
-    );
+    throw new DomeError("Hodnocení se nepodařilo uložit. Zkuste to prosím znovu.");
   }
 }
 

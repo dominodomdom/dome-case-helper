@@ -26,7 +26,13 @@ async function loadCaseContext(caseId: string, accessToken: string) {
     .select(`${c.id},${c.ownerId},${c.title},${c.description}`)
     .eq(c.id, caseId)
     .maybeSingle();
-  if (kase.error) throw new DomeError(`Případ nelze načíst: ${kase.error.message}`);
+  if (kase.error) {
+    console.error("dome.loadCaseContext.case", {
+      code: kase.error.code,
+      message: kase.error.message,
+    });
+    throw new DomeError("Případ se nepodařilo načíst. Zkuste to prosím znovu.");
+  }
   if (!kase.data) throw new DomeError("Případ nebyl nalezen.", 404);
   const row = kase.data as Record<string, unknown>;
   if (row[c.ownerId] !== userId) throw new DomeError("Případ vám nepatří.", 403);
@@ -36,7 +42,13 @@ async function loadCaseContext(caseId: string, accessToken: string) {
     .eq(s.caseId, caseId)
     .order(s.createdAt, { ascending: true })
     .order(s.id, { ascending: true });
-  if (steps.error) throw new DomeError(`Kroky případu nelze načíst: ${steps.error.message}`);
+  if (steps.error) {
+    console.error("dome.loadCaseContext.steps", {
+      code: steps.error.code,
+      message: steps.error.message,
+    });
+    throw new DomeError("Historii případu se nepodařilo načíst. Zkuste to prosím znovu.");
+  }
 
   const lines: string[] = [
     `NÁZEV PŘÍPADU: ${row[c.title] ?? ""}`,
@@ -111,7 +123,10 @@ async function readLatestAssessment(
     .order(s.id, { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (r.error) throw new DomeError(`Stav případu nelze ověřit: ${r.error.message}`);
+  if (r.error) {
+    console.error("dome.readLatestAssessment", { code: r.error.code, message: r.error.message });
+    throw new DomeError("Aktuální stav případu se nepodařilo ověřit. Zkuste to prosím znovu.");
+  }
   return (
     ((r.data as Record<string, unknown> | null)?.[s.assessment] as Record<
       string,
@@ -233,13 +248,22 @@ export const analyzeDocument = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<Result<{ summary: string }>> => {
     try {
       const { verifyUser, callAi, DomeError } = await import("./dome.server");
-      const { sb } = await verifyUser(data.accessToken);
+      const { sb, userId } = await verifyUser(data.accessToken);
       const own = await sb
         .from(SCHEMA.cases.table)
-        .select(SCHEMA.cases.columns.id)
+        .select(`${SCHEMA.cases.columns.id},${SCHEMA.cases.columns.ownerId}`)
         .eq(SCHEMA.cases.columns.id, data.caseId)
         .maybeSingle();
-      if (own.error || !own.data) throw new DomeError("Případ nebyl nalezen.", 404);
+      if (own.error) {
+        console.error("dome.analyzeDocument.case", {
+          code: own.error.code,
+          message: own.error.message,
+        });
+        throw new DomeError("Případ se nepodařilo ověřit. Zkuste to prosím znovu.");
+      }
+      if (!own.data) throw new DomeError("Případ nebyl nalezen.", 404);
+      if ((own.data as Record<string, unknown>)[SCHEMA.cases.columns.ownerId] !== userId)
+        throw new DomeError("Případ vám nepatří.", 403);
 
       const url = `data:${data.mimeType};base64,${data.base64}`;
       const filePart =
@@ -265,10 +289,13 @@ export const analyzeDocument = createServerFn({ method: "POST" })
         [s.documentName]: data.fileName,
         [s.content]: summary.trim(),
       });
-      if (ins.error)
-        throw new DomeError(
-          `Dokument se nepodařilo zapsat: ${ins.error.message} (kód: ${ins.error.code ?? "?"})`,
-        );
+      if (ins.error) {
+        console.error("dome.analyzeDocument.insert", {
+          code: ins.error.code,
+          message: ins.error.message,
+        });
+        throw new DomeError("Dokument se nepodařilo uložit. Zkuste to prosím znovu.");
+      }
       return { ok: true, data: { summary } };
     } catch (e) {
       return fail(e);
