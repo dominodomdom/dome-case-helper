@@ -26,7 +26,6 @@ function throwSafeDatabaseError(
   throw new Error(userMessage);
 }
 
-
 /** Explicitní projekce skutečných sloupců public.urad_cases. */
 const CASE_SELECT = [
   c.id,
