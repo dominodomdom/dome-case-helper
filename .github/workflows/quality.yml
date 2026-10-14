@@ -40,7 +40,7 @@ jobs:
         run: bun run test
 
       - name: Format D1 files
-        run: bunx prettier --write src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/case-state.test.ts
+        run: bunx prettier --write src/components/dome/DomeWorkspace.tsx src/components/ui/badge.tsx src/components/ui/button.tsx src/components/ui/form.tsx src/components/ui/navigation-menu.tsx src/components/ui/sidebar.tsx src/components/ui/toggle.tsx src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/ai-independence-workspace.test.tsx src/test/case-state.test.ts
 
       - name: Commit formatting fixes on the working branch
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
@@ -49,7 +49,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/case-state.test.ts
+          git add src/components/dome/DomeWorkspace.tsx src/components/ui/badge.tsx src/components/ui/button.tsx src/components/ui/form.tsx src/components/ui/navigation-menu.tsx src/components/ui/sidebar.tsx src/components/ui/toggle.tsx src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/ai-independence-workspace.test.tsx src/test/case-state.test.ts
           if ! git diff --cached --quiet; then
             git commit -m "style: format D1 schema and tests"
             git push origin "HEAD:${TARGET_BRANCH}"
