@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Sparkles, FileText, User, Paperclip, Loader2 } from "lucide-react";
@@ -40,7 +40,6 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
   const [error, setError] = useState<string | null>(null);
   const [answer, setAnswer] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
-  const autoTried = useRef<string | null>(null);
 
   const list = steps.data ?? [];
   const last = list[list.length - 1];
@@ -78,15 +77,8 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
     }
   }
 
-  // Automaticky jen jednou na daný stav (žádný nový vstup = žádné nové vyhodnocení, žádné opakování).
-  useEffect(() => {
-    if (!needsAssessment || busy) return;
-    const key = last?.id ?? "empty";
-    if (autoTried.current === key) return;
-    autoTried.current = key;
-    void runAssessment();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needsAssessment, last?.id, busy]);
+  // AI Independence: AI se NIKDY nespouští automaticky (otevření případu ani načtení historie AI nevolá).
+  // Vyhodnocení spouští výhradně explicitní akce uživatele (tlačítko „Spustit AI rozbor případu“).
 
   async function sendText(text: string) {
     if (!text) return false;
@@ -153,6 +145,25 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
       {busy === "assess" && (
         <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-6 text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> DOME vyhodnocuje celý případ…
+        </div>
+      )}
+
+      {needsAssessment && busy !== "assess" && (
+        <div
+          className="rounded-2xl border border-border bg-card p-6"
+          data-testid="no-auto-assessment"
+        >
+          <p className="font-display font-semibold">
+            {latest ? "Od posledního rozboru přibyly nové informace" : "Případ zatím nemá rozbor"}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            Automatické hodnocení se nespouští. Můžete dál psát odpovědi, přidávat dokumenty a
+            pracovat s uloženým plánem. Rozbor pomocí AI je volitelný a spustí se jen na vaši
+            žádost.
+          </p>
+          <Button className="mt-4" variant="outline" disabled={!!busy} onClick={() => void runAssessment()}>
+            <Sparkles className="h-4 w-4" /> Spustit AI rozbor případu
+          </Button>
         </div>
       )}
 
