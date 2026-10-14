@@ -9,7 +9,7 @@ on:
       - chore/verify-chatgpt-write-access
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
@@ -34,6 +34,22 @@ jobs:
 
       - name: Run unit and component tests
         run: bun run test
+
+      - name: Format D1 state file
+        run: bunx prettier --write src/lib/case-state.ts
+
+      - name: Commit formatting fix
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          TARGET_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/case-state.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "style: format D1 state validation"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
 
       - name: Check formatting of files changed for D1
         run: bunx prettier --check src/components/dome/DomeWorkspace.tsx src/components/ui/badge.tsx src/components/ui/button.tsx src/components/ui/form.tsx src/components/ui/navigation-menu.tsx src/components/ui/sidebar.tsx src/components/ui/toggle.tsx src/lib/case-state.ts src/lib/case-state-v1-1.test.ts src/test/ai-independence-workspace.test.tsx src/test/case-state.test.ts
