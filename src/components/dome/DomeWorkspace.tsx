@@ -161,7 +161,12 @@ export function DomeWorkspace({ item }: { item: UradCase }) {
             pracovat s uloženým plánem. Rozbor pomocí AI je volitelný a spustí se jen na vaši
             žádost.
           </p>
-          <Button className="mt-4" variant="outline" disabled={!!busy} onClick={() => void runAssessment()}>
+          <Button
+            className="mt-4"
+            variant="outline"
+            disabled={!!busy}
+            onClick={() => void runAssessment()}
+          >
             <Sparkles className="h-4 w-4" /> Spustit AI rozbor případu
           </Button>
         </div>
