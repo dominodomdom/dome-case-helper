@@ -77,6 +77,21 @@ describe("DomeCaseState schema 1.1", () => {
         "evidence_link broken-link: neznámá evidence",
         "evidence_link broken-link: neznámá reality",
       ]));
+
+      normalized.deadlines = [{
+        id: "bad-deadline",
+        label: "Neplatný termín",
+        date: null,
+        date_status: "KNOWN",
+        source: "SYSTEM",
+        anchor_type: "NEED",
+        anchor_ref: null,
+        evidence_ids: [],
+      }];
+      expect(validateCaseState(normalized)).toEqual(expect.arrayContaining([
+        "deadline bad-deadline: date_status",
+        "deadline bad-deadline: neúplná vazba anchor",
+      ]));
     }
   });
 
