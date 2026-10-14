@@ -8,10 +8,10 @@
 | Lint | `bun run lint` (auto-fix: `bunx eslint --fix .`) |
 | Build | `bun run build` |
 
-## Suites (63 tests, all mocked)
+## Suites (69 tests, all mocked)
 | File | Covers |
 | --- | --- |
-| `case-state.test.ts` | DomeCaseState build/validate, CLAIM≠FACT, evidence boundary, amount/deadline binding, legacy normalisation, preserved DONE/WAITING/BLOCKED |
+| `case-state.test.ts` and `case-state-v1-1.test.ts` | DomeCaseState build/validate, CLAIM≠FACT, evidence boundary, amount/deadline binding, legacy normalisation, preserved DONE/WAITING/BLOCKED |
 | `d2-concurrency.test.ts` | `recordAssessment`: 3-param call, version 0→1, 2 and 10 concurrent writers (in-memory lock fake), stale → 409, invalid versions, unauthorised/foreign case |
 | `ai-provider.test.ts` | provider success, missing key, empty input, HTTP error mapping, refusal/failed/empty stream, unknown provider |
 | `support-engine.test.ts` | need detection, service matching, no fabricated services |
