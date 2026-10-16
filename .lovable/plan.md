@@ -27,7 +27,7 @@ Pravidla v zadání pro AI: vždy jen jedna otázka; nic nevydávat za fakt bez 
 
 ## Zobrazení (stávající vzhled)
 
-- Nahoře: „Pracovní hypotéza" se štítkem *neověřeno*.
+- Nahoře: „Pracovní hypotéza" se štítkem _neověřeno_.
 - Panel stavu: Uvedeno / K ověření / Chybí zjistit / Potřebné dokumenty.
 - Výrazně: jedna aktuální otázka DOME + pole odpovědi a nahrání souboru.
 - Pod tím: chronologie dosavadních kroků.
