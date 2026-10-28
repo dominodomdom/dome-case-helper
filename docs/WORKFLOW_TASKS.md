@@ -10,9 +10,10 @@ Branch: workflow/dome-os-urad-mvp
 | ID | Priority | State | Task | Acceptance evidence / next step |
 |---|---|---|---|---|
 | MVP-001 | P0 | VERIFIED | Establish versioned workflow specification | Commit 18510ef2a30abfd5f8546fa32dbf7d369d4c4f8a on workflow/dome-os-urad-mvp; review spec for approval gates and source-of-truth boundaries |
-| MVP-002 | P0 | IN_PROGRESS | Add workflow task ledger and link it to the specification | This file exists on the working branch; verify branch contents and commit |
-| MVP-003 | P0 | READY | Open a draft pull request and run existing quality CI | Reuse .github/workflows/quality.yml; capture CI result; do not merge automatically |
+| MVP-002 | P0 | VERIFIED | Add workflow task ledger and link it to the specification | Committed as 41cdf03c90663e5475325f7526d26abbbcef1542 on workflow/dome-os-urad-mvp |
+| MVP-003 | P0 | IN_PROGRESS | Open a draft pull request and run existing quality CI | Draft PR #8 opened; Quality checks run 40720367020 was in progress at last check; wait for final result |
 | MVP-004 | P0 | READY | Verify workflow resume behavior and evidence format | Define how the next run reads branch, task ledger, PR/CI and live case status without duplicate actions |
+| MVP-005 | P0 | READY | Add agent runbook so repository-aware agents can resume consistently | Append workflow operating instructions to AGENTS.md on the feature branch; validate no existing instructions were overwritten |
 | SEC-001 | P1 | READY | Review urad_write_audit authorization boundary | Inspect caller sites and grants; prepare safe isolated test; no destructive or unauthorized production probes |
 | SEC-002 | P1 | READY | Review TRUNCATE grants on case and audit tables | Inventory dependencies and intended grants; prepare migration proposal only |
 | SEC-003 | P1 | READY | Review assessment RPC overloads | Map all overloads to app call sites and grants; keep legacy records compatible |
