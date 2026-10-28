@@ -52,3 +52,15 @@ No production changes have been applied.
 A read-only query against project `ypvawhikizjulysxkojd` returned zero rows from `storage.buckets`. Treat this as “no buckets visible to the queried database role”; confirm in the Supabase Storage dashboard/API before concluding that no bucket exists.
 
 The live schema query also confirmed `urad_case_steps` has no request-id/idempotency column or unique constraint beyond its primary key. The table's authenticated INSERT policy permits `user_input` and `user_document` rows when `user_id = auth.uid()`, `urad_has_access()` is true, and the referenced case belongs to the caller. This supports ownership isolation but does not establish provenance of a document summary; a client can potentially create a user_document-shaped row without uploading an original. Decide whether user_document creation should be server-only during the staging policy review. No policies were changed.
+
+
+## Additional live database observations (read-only, 2026-10-28)
+
+- `public.urad_case_steps` has RLS enabled, but `FORCE ROW LEVEL SECURITY` is false. Its observed authenticated INSERT policy requires `user_id = auth.uid()`, `urad_has_access()`, a permitted kind (`user_input` or `user_document`), and a case owned by the caller. Its SELECT policy similarly checks owner and access.
+- `public.urad_cases` has RLS enabled and forced; the audit log also has RLS enabled and forced.
+- The queried `information_schema.triggers` view returned no rows for these tables. This may reflect schema visibility or the query's scope; do not treat it as proof that no triggers exist. Catalog-level trigger inventory is still required.
+- The read-only query returned no rows from `storage.buckets`. Because this query ran through a read-only database role, this is not sufficient by itself to prove that the Storage dashboard has no buckets. Confirm through the project Storage API/dashboard before creating any bucket.
+
+### Security implication
+
+A user_document-shaped database step is a summary record, not proof that an original file was safely retained. The client-side insert policy allows authenticated owners to create `user_document` steps, so the system should not present the presence of such a step as proof of an uploaded, checksum-verified original. Review whether only the trusted server path should create this kind of row, using staging tests and a migration proposal before any production policy change.
