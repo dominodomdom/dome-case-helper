@@ -21,5 +21,23 @@
 - Real-world support (need detection, service matching, transport, HumanHandoff object) lives in src/lib/support-engine.ts and runs server-side after enforceAssessmentInvariants; its output is stored inside the assessment JSONB — why: no schema change, and concrete services/routes enter only through SupportServiceRegistry/TransportProvider implementations backed by a verified source (defaults return nothing).
 - Canonical case model is DomeCaseState in src/lib/case-state.ts (schema-versioned), stored as assessment.case_state in urad_case_steps; built and validated server-side, user action-status changes go through updateActionStatus (server fn, optimistic version check) and are saved as a new immutable assessment step — why: no new tables, full history, invalid state is never persisted. Legacy assessments are read only through normalizeCaseState. Future engines plug in via the CaseEngine interface.
 - Phase 1 persists DomeCaseState as JSONB in urad_case_steps; this is not a decision for all future entities — re-review the data model before Phase 3. Why: keep the schema decision reversible.
-
 - AI calls go only through the AiProvider interface in src/lib/ai-provider.server.ts (default Lovable AI Gateway, selected by server env AI_PROVIDER) — why: domain logic must not depend on a single vendor.
+
+## DOME OS ÚŘAD workflow operation
+
+When asked to "Pokračuj" on the DOME OS ÚŘAD workflow:
+
+1. Read docs/WORKFLOW_SPECIFICATION.md and docs/WORKFLOW_TASKS.md first.
+2. Confirm the current branch, open PR, latest commit, and CI status before changing files.
+3. Treat GitHub as the technical source of truth for code, workflow rules, tests, and review history; treat Supabase as the source of truth for live case data.
+4. Choose the highest-priority READY task whose dependencies are met. Record work and evidence in the task ledger; never infer DONE from intention alone.
+5. Start with read-only inspection. Make reversible changes on a separate branch; never push workflow changes directly to main.
+6. Use the existing .github/workflows/quality.yml for PR CI instead of duplicating the quality workflow.
+7. Never perform production migrations, permission/grant changes, destructive data operations, external submissions/messages, or cost-incurring actions without explicit user approval.
+8. Do not run destructive or unauthorized exploit probes against production. Use an isolated test environment or static inspection for security boundaries.
+9. Before closing a task, record commit/PR links, tests, environment, results, and remaining limitations. If blocked, set BLOCKED and state the exact missing dependency.
+10. A safe run may continue to the next task without asking for permission; stop only at a meaningful approval gate or hard blocker.
+
+Canonical workflow records:
+- Specification: docs/WORKFLOW_SPECIFICATION.md
+- Task ledger: docs/WORKFLOW_TASKS.md
