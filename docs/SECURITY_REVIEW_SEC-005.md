@@ -64,3 +64,10 @@ The live schema query also confirmed `urad_case_steps` has no request-id/idempot
 ### Security implication
 
 A user_document-shaped database step is a summary record, not proof that an original file was safely retained. The client-side insert policy allows authenticated owners to create `user_document` steps, so the system should not present the presence of such a step as proof of an uploaded, checksum-verified original. Review whether only the trusted server path should create this kind of row, using staging tests and a migration proposal before any production policy change.
+
+
+### Follow-up verification
+
+The connected Supabase Storage bucket-list API returned an empty list for project `ypvawhikizjulysxkojd`. As of this read-only check, no Storage buckets are configured/visible in that project. Do not create one automatically: first confirm this is the intended project and approve a retention policy and staging plan.
+
+A direct `pg_trigger` catalog query found four enabled triggers on `public.urad_cases` (audit, approved-access gate, updated timestamp, unsafe-close guard), and no user-defined triggers on `public.urad_case_steps` or `public.urad_audit_log` in the query scope. This supersedes the earlier uncertainty about trigger visibility for those specific tables.
