@@ -45,3 +45,10 @@ This creates a functional gap if the user later needs to prove exactly what an a
 - Mark SEC-005 VERIFIED only after staging acceptance tests pass.
 
 No production changes have been applied.
+
+
+## Read-only live inventory update (2026-10-28)
+
+A read-only query against project `ypvawhikizjulysxkojd` returned zero rows from `storage.buckets`. Treat this as “no buckets visible to the queried database role”; confirm in the Supabase Storage dashboard/API before concluding that no bucket exists.
+
+The live schema query also confirmed `urad_case_steps` has no request-id/idempotency column or unique constraint beyond its primary key. The table's authenticated INSERT policy permits `user_input` and `user_document` rows when `user_id = auth.uid()`, `urad_has_access()` is true, and the referenced case belongs to the caller. This supports ownership isolation but does not establish provenance of a document summary; a client can potentially create a user_document-shaped row without uploading an original. Decide whether user_document creation should be server-only during the staging policy review. No policies were changed.
