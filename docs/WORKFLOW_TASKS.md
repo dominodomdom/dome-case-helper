@@ -16,7 +16,7 @@ Branch: workflow/dome-os-urad-mvp
 | MVP-004 | P0 | READY | Verify workflow resume behavior and evidence format | Confirm branch, ledger, PR/CI, and live case status can be reconciled without duplicate actions |
 | MVP-005 | P0 | VERIFIED | Add agent runbook to AGENTS.md | Commit 5580ab05098589886c0ffd220d4f1761428b10ec; existing instructions retained and workflow section appended |
 | MVP-006 | P0 | VERIFIED | Add reusable workflow skill | Commit fe2c1d3e683770aa899866cfdd0a6c4397644362; skill file verified by fetching it from the branch; quality CI succeeded |
-| SEC-001 | P1 | READY | Review urad_write_audit authorization boundary | Inspect caller sites and grants; prepare safe isolated test; no destructive or unauthorized production probes |
+| SEC-001 | P1 | IN_PROGRESS | Review urad_write_audit authorization boundary | Static review saved in [SECURITY_REVIEW_SEC-001.md](./SECURITY_REVIEW_SEC-001.md); exact function definition/callers and staging tests still required |
 | SEC-002 | P1 | READY | Review TRUNCATE grants on case and audit tables | Inventory dependencies and intended grants; prepare migration proposal only |
 | SEC-003 | P1 | READY | Review assessment RPC overloads | Map all overloads to app call sites and grants; keep legacy records compatible |
 | SEC-004 | P1 | READY | Design server-side idempotency for retryable writes | Request-ID/deduplication design plus retry/race test plan |
