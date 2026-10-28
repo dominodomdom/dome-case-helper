@@ -21,7 +21,7 @@ Branch: workflow/dome-os-urad-mvp
 | SEC-003 | P1 | IN_PROGRESS | Review assessment RPC overloads | Live definitions/grants and current app call site mapped in [SECURITY_REVIEW_SEC-003.md](./SECURITY_REVIEW_SEC-003.md); external caller inventory and staging tests remain open |
 | SEC-004 | P1 | IN_PROGRESS | Design server-side idempotency for retryable writes | Design recorded in [SECURITY_REVIEW_SEC-004.md](./SECURITY_REVIEW_SEC-004.md); app/database implementation and retry/race tests remain open |
 | SEC-005 | P2 | IN_PROGRESS | Design secure original-document retention | Design recorded in [SECURITY_REVIEW_SEC-005.md](./SECURITY_REVIEW_SEC-005.md); bucket/policy inventory, retention decision, staging migration and access tests remain open |
-| SEC-006 | P1 | READY | Plan real integration verification | Signed-in E2E, two-user isolation, database concurrency, PDF/image upload in a controlled environment |
+| SEC-006 | P1 | IN_PROGRESS | Plan real integration verification | Acceptance matrix recorded in [SECURITY_REVIEW_SEC-006.md](./SECURITY_REVIEW_SEC-006.md); staging project and execution remain outstanding |
 
 ## State rules
 
